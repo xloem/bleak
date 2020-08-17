@@ -1,36 +1,5 @@
-=============
-Scan/Discover
-=============
-
-To discover Bluetooth devices that can be connected to:
-
-.. code-block:: python
-
-    import asyncio
-    from bleak import discover
-
-    async def run():
-        devices = await discover()
-        for d in devices:
-            print(d)
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(run())
-
-This will produce a printed list of detected devices:
-
-.. code-block:: sh
-
-    24:71:89:CC:09:05: CC2650 SensorTag
-    4D:41:D5:8C:7A:0B: Apple, Inc. (b'\x10\x06\x11\x1a\xb2\x9b\x9c\xe3')
-
-The first part, a MAC address in Windows and Linux and a UUID in macOS, is what is
-used for connecting to a device using Bleak. The list of objects returned by the `discover`
-method are instances of :py:class:`bleak.backends.device.BLEDevice` and has ``name``, ``address``
-and ``rssi`` attributes, as well as a ``metadata`` attribute, a dict with keys ``uuids`` and ``manufacturer_data``
-which potentially contains a list of all service UUIDs on the device and a binary string of data from
-the manufacturer of the device respectively.
-
+Scanning
+========
 
 BleakScanner
 ------------
@@ -128,6 +97,11 @@ To be written. In the meantime, check
 
 
 Scanning filter examples in Core Bluetooth backend
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To be implemented. Exists in a draft in `PR #209 <https://github.com/hbldh/bleak/pull/209>`_.
+
+Advertised data
+---------------
+
+TBW.

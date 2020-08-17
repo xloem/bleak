@@ -1,6 +1,5 @@
-=====
-Usage
-=====
+Basic usage
+==============
 
 .. note::
 
@@ -10,6 +9,40 @@ Usage
     handle or even the ``BleakGATTCharacteristic`` object itself in
     ``read_gatt_char``, ``write_gatt_char``, ``start_notify``, and ``stop_notify``.
 
+Scanning
+--------
+
+To discover Bluetooth devices that can be connected to:
+
+.. code-block:: python
+
+    import asyncio
+    from bleak import discover
+
+    async def run():
+        devices = await discover()
+        for d in devices:
+            print(d)
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run())
+
+This will produce a printed list of detected devices:
+
+.. code-block:: sh
+
+    24:71:89:CC:09:05: CC2650 SensorTag
+    4D:41:D5:8C:7A:0B: Apple, Inc. (b'\x10\x06\x11\x1a\xb2\x9b\x9c\xe3')
+
+The first part, a MAC address in Windows and Linux and a UUID in macOS, is what is
+used for connecting to a device using Bleak. The list of objects returned by the `discover`
+method are instances of :py:class:`bleak.backends.device.BLEDevice` and has ``name``, ``address``
+and ``rssi`` attributes, as well as a ``metadata`` attribute, a dict with keys ``uuids`` and ``manufacturer_data``
+which potentially contains a list of all service UUIDs on the device and a binary string of data from
+the manufacturer of the device respectively.
+
+Connecting to a device
+----------------------
 
 One can use the ``BleakClient`` to connect to a Bluetooth device and read its model number
 via the asyncronous context manager like this:
@@ -58,5 +91,8 @@ Make sure you always get to call the disconnect method for a client before disca
 the Bluetooth stack on the OS might need to be cleared of residual data which is cached in the
 ``BleakClient``.
 
-See `examples <https://github.com/hbldh/bleak/tree/master/examples>`_ folder for more code, e.g. on how
-to keep a connection alive over a longer duration of time.
+Notifications
+-------------
+
+TBW.
+
