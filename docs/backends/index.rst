@@ -10,6 +10,8 @@ Bleak supports the following operating systems:
 However, there are platform specific differences from and/or additions to the interface API in the difference OS backend implementations.
 
 
+.. _windows-backend:
+
 Windows backend
 ---------------
 
@@ -34,6 +36,7 @@ Specific features for the Windows backend
 - ``BleakClient``: The constructor keyword ``address_type`` which can have the values ``"public"`` or ``"random"``. This value
    makes sure that the connection is made in a fashion that suits the peripheral.
 
+.. _macos-backend:
 
 macOS backend
 -------------
@@ -64,6 +67,8 @@ In the example files, this is handled in this fashion:
 As stated above, this will however only work the macOS machine that performed
 the scan and thus cached the device as ``243E23AE-4A99-406C-B317-18F1BD7B4CBE``.
 
+
+.. _linux-backend:
 
 Linux backend
 -------------
