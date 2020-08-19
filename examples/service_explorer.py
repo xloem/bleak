@@ -34,7 +34,7 @@ async def run(address, debug=False):
             for char in service.characteristics:
                 if "read" in char.properties:
                     try:
-                        value = bytes(await client.read_gatt_char(char.uuid))
+                        value = bytes(await client.read_gatt_char(char.handle))
                     except Exception as e:
                         value = str(e).encode()
                 else:

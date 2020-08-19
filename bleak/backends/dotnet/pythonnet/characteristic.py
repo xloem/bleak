@@ -4,7 +4,7 @@ from typing import List, Union
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.descriptor import BleakGATTDescriptor
-from bleak.backends.dotnet.descriptor import BleakGATTDescriptorDotNet
+from bleak.backends.dotnet.pythonnet.descriptor import BleakGATTDescriptorDotNet
 
 from Windows.Devices.Bluetooth.GenericAttributeProfile import GattCharacteristic
 

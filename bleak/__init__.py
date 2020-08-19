@@ -79,9 +79,13 @@ elif platform.system() == "Windows":
             "Requires at least Windows 10 version 0.16299 (Fall Creators Update)."
         )
 
-    from bleak.backends.dotnet.discovery import discover  # noqa
-    from bleak.backends.dotnet.scanner import BleakScannerDotNet as BleakScanner  # noqa
-    from bleak.backends.dotnet.client import BleakClientDotNet as BleakClient  # noqa
+    from bleak.backends.dotnet.winrt.discovery import discover  # noqa
+    from bleak.backends.dotnet.winrt.scanner import BleakScannerWinRT as BleakScanner  # noqa
+    from bleak.backends.dotnet.winrt.client import BleakClientWinRT as BleakClient  # noqa
+
+    # from bleak.backends.dotnet.pythonnet.discovery import discover  # noqa
+    # from bleak.backends.dotnet.pythonnet.scanner import BleakScannerDotNet as BleakScanner  # noqa
+    # from bleak.backends.dotnet.pythonnet.client import BleakClientDotNet as BleakClient  # noqa
 
 
 def cli():

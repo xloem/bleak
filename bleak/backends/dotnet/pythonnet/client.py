@@ -13,14 +13,14 @@ from typing import Callable, Any, Union
 
 from bleak.exc import BleakError, BleakDotNetTaskError, CONTROLLER_ERROR_CODES
 from bleak.backends.client import BaseBleakClient
-from bleak.backends.dotnet.discovery import discover
-from bleak.backends.dotnet.utils import wrap_IAsyncOperation
+from bleak.backends.dotnet.pythonnet.discovery import discover
+from bleak.backends.dotnet.pythonnet.utils import wrap_IAsyncOperation
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.service import BleakGATTServiceCollection
-from bleak.backends.dotnet.service import BleakGATTServiceDotNet
-from bleak.backends.dotnet.characteristic import BleakGATTCharacteristicDotNet
-from bleak.backends.dotnet.descriptor import BleakGATTDescriptorDotNet
+from bleak.backends.dotnet.pythonnet.service import BleakGATTServiceDotNet
+from bleak.backends.dotnet.pythonnet.characteristic import BleakGATTCharacteristicDotNet
+from bleak.backends.dotnet.pythonnet.descriptor import BleakGATTDescriptorDotNet
 
 
 # CLR imports
@@ -38,11 +38,9 @@ from Windows.Devices.Bluetooth import (
     BluetoothAddressType,
 )
 from Windows.Devices.Bluetooth.GenericAttributeProfile import (
-    GattDeviceService,
     GattDeviceServicesResult,
     GattCharacteristic,
     GattCharacteristicsResult,
-    GattDescriptor,
     GattDescriptorsResult,
     GattCommunicationStatus,
     GattReadResult,

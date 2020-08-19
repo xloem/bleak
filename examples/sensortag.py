@@ -63,34 +63,51 @@ f000ffc4-0451-4000-b000-000000000000
 
 uuid16_dict = {v: k for k, v in uuid16_dict.items()}
 
-SYSTEM_ID_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("System ID")
-)
-MODEL_NBR_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("Model Number String")
-)
-DEVICE_NAME_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("Device Name")
-)
-FIRMWARE_REV_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("Firmware Revision String")
-)
-HARDWARE_REV_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("Hardware Revision String")
-)
-SOFTWARE_REV_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("Software Revision String")
-)
-MANUFACTURER_NAME_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("Manufacturer Name String")
-)
-BATTERY_LEVEL_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
-    uuid16_dict.get("Battery Level")
-)
-KEY_PRESS_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(0xffe1)
-# I/O test points on SensorTag.
-IO_DATA_CHAR_UUID = "f000aa65-0451-4000-b000-000000000000"
-IO_CONFIG_CHAR_UUID = "f000aa66-0451-4000-b000-000000000000"
+_use_handles = True
+
+if _use_handles:
+    SYSTEM_ID_UUID = 10
+    MODEL_NBR_UUID = 12
+    DEVICE_NAME_UUID = 2
+    FIRMWARE_REV_UUID = 16
+    HARDWARE_REV_UUID = 18
+    SOFTWARE_REV_UUID = 20
+    MANUFACTURER_NAME_UUID = 22
+    BATTERY_LEVEL_UUID = 29
+    KEY_PRESS_UUID = 75
+    IO_DATA_CHAR_UUID = 80
+    IO_CONFIG_CHAR_UUID = 82
+
+else:
+
+    SYSTEM_ID_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("System ID")
+    )
+    MODEL_NBR_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("Model Number String")
+    )
+    DEVICE_NAME_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("Device Name")
+    )
+    FIRMWARE_REV_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("Firmware Revision String")
+    )
+    HARDWARE_REV_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("Hardware Revision String")
+    )
+    SOFTWARE_REV_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("Software Revision String")
+    )
+    MANUFACTURER_NAME_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("Manufacturer Name String")
+    )
+    BATTERY_LEVEL_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(
+        uuid16_dict.get("Battery Level")
+    )
+    KEY_PRESS_UUID = "0000{0:x}-0000-1000-8000-00805f9b34fb".format(0xffe1)
+    # I/O test points on SensorTag.
+    IO_DATA_CHAR_UUID = "f000aa65-0451-4000-b000-000000000000"
+    IO_CONFIG_CHAR_UUID = "f000aa66-0451-4000-b000-000000000000"
 
 
 async def run(address, debug=False):
@@ -154,7 +171,6 @@ async def run(address, debug=False):
         await client.start_notify(KEY_PRESS_UUID, keypress_handler)
         await asyncio.sleep(5.0)
         await client.stop_notify(KEY_PRESS_UUID)
-
 
 if __name__ == "__main__":
     import os
