@@ -17,8 +17,11 @@ from Windows.Devices.Bluetooth.Advertisement import (
     BluetoothLEAdvertisementWatcher,
     BluetoothLEScanningMode,
     BluetoothLEAdvertisementType,
+    BluetoothLEAdvertisementReceivedEventArgs,
+    BluetoothLEAdvertisementWatcherStoppedEventArgs,
 )
 from Windows.Foundation import TypedEventHandler
+from Windows.Storage.Streams import DataReader, IBuffer
 
 logger = logging.getLogger(__name__)
 _here = pathlib.Path(__file__).parent
@@ -60,6 +63,9 @@ class BleakScannerDotNet(BaseBleakScanner):
     def __init__(self, **kwargs):
         super(BleakScannerDotNet, self).__init__()
 
+        self._bridge = kwargs.get('bridge')
+        self._delete_bridge_after_stop = 'bridge' not in kwargs
+
         self.watcher = None
         self._devices = {}
         self._scan_responses = {}
@@ -95,11 +101,25 @@ class BleakScannerDotNet(BaseBleakScanner):
             )
 
     async def start(self):
+
+        if self._bridge is None:
+            self._bridge = Bridge()
+            self._delete_bridge_after_stop = True
+
         self.watcher = BluetoothLEAdvertisementWatcher()
         self.watcher.ScanningMode = self._scanning_mode
 
-        self.watcher.Received += self.AdvertisementWatcher_Received
-        self.watcher.Stopped += self.AdvertisementWatcher_Stopped
+        self._bridge.AddWatcherEventHandlers(
+            self.watcher,
+            TypedEventHandler[
+                BluetoothLEAdvertisementWatcher,
+                BluetoothLEAdvertisementReceivedEventArgs
+            ](self.AdvertisementWatcher_Received),
+            TypedEventHandler[
+                BluetoothLEAdvertisementWatcher,
+                BluetoothLEAdvertisementWatcherStoppedEventArgs,
+            ](self.AdvertisementWatcher_Stopped),
+        )
 
         if self._signal_strength_filter is not None:
             self.watcher.SignalStrengthFilter = self._signal_strength_filter
@@ -111,11 +131,13 @@ class BleakScannerDotNet(BaseBleakScanner):
     async def stop(self):
         self.watcher.Stop()
 
-        try:
-            self.watcher.Received -= self.AdvertisementWatcher_Received
-            self.watcher.Stopped -= self.AdvertisementWatcher_Stopped
-        except Exception as e:
-            logger.debug("Could not remove event handlers: {0}...".format(e))
+        self._bridge.RemoveWatcherEventHandlers(self.watcher)
+
+        if self._delete_bridge_after_stop:
+            self._bridge.Dispose()
+            self._bridge = None
+            self._delete_bridge_after_stop = False
+
         self.watcher = None
 
     async def set_scanning_filter(self, **kwargs):

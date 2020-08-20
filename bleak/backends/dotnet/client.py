@@ -180,7 +180,10 @@ class BleakClientDotNet(BaseBleakClient):
             ):
                 loop.call_soon_threadsafe(self._disconnected_callback, self)
 
-        self._requester.ConnectionStatusChanged += _ConnectionStatusChanged_Handler
+        self._bridge.AddConnectionStatusChangedHandler(
+            self._requester,
+            TypedEventHandler[BluetoothLEDevice, Object](_ConnectionStatusChanged_Handler)
+        )
 
         # Obtain services, which also leads to connection being established.
         services = await self.get_services()
@@ -218,6 +221,8 @@ class BleakClientDotNet(BaseBleakClient):
         for characteristic in self.services.characteristics.values():
             self._bridge.RemoveValueChangedCallback(characteristic.obj)
         self._notification_callbacks.clear()
+
+        self._bridge.RemoveConnectionStatusChangedHandler(self._requester)
 
         # Dispose all service components that we have requested and created.
         for service in self.services:

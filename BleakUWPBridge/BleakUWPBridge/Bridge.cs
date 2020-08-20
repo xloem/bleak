@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Windows.Devices.Bluetooth;
+using Windows.Devices.Bluetooth.Advertisement;
 using Windows.Devices.Bluetooth.GenericAttributeProfile;
 using Windows.Foundation;
 
@@ -8,8 +10,11 @@ namespace BleakBridge
 {
     public class Bridge: IDisposable
     {
+        public TypedEventHandler<BluetoothLEAdvertisementWatcher, BluetoothLEAdvertisementReceivedEventArgs> receivedCallback;
+        public TypedEventHandler<BluetoothLEAdvertisementWatcher, BluetoothLEAdvertisementWatcherStoppedEventArgs> stoppedCallback;
+        public TypedEventHandler<BluetoothLEDevice, object> connectionStatusChangedCallback;
         public Dictionary<ushort, TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs>> callbacks;
-        
+
         public Bridge()
         {
             callbacks = new Dictionary<ushort, TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs>>();
@@ -17,10 +22,51 @@ namespace BleakBridge
 
         public void Dispose()
         {
+            this.receivedCallback = null;
+            this.stoppedCallback = null;
             callbacks.Clear();
         }
 
-        #region Notifications
+        #region BLE Device Event Handlers Handling
+
+        public void AddConnectionStatusChangedHandler(BluetoothLEDevice device, TypedEventHandler<BluetoothLEDevice, object> connectionStatusChangedCallback)
+        {
+            this.connectionStatusChangedCallback = connectionStatusChangedCallback;
+            device.ConnectionStatusChanged += this.connectionStatusChangedCallback;
+        }
+        public void RemoveConnectionStatusChangedHandler(BluetoothLEDevice device)
+        {
+            device.ConnectionStatusChanged -= this.connectionStatusChangedCallback;
+            this.connectionStatusChangedCallback = null;
+        }
+
+        #endregion
+
+        #region BLE Advertisement Watcher Event Handlers Handling
+
+        public void AddWatcherEventHandlers(
+            BluetoothLEAdvertisementWatcher watcher,
+            TypedEventHandler<BluetoothLEAdvertisementWatcher, BluetoothLEAdvertisementReceivedEventArgs> receivedCallback,
+            TypedEventHandler<BluetoothLEAdvertisementWatcher, BluetoothLEAdvertisementWatcherStoppedEventArgs> stoppedCallback
+        )
+        {
+            this.receivedCallback = receivedCallback;
+            watcher.Received += this.receivedCallback;
+            this.stoppedCallback = stoppedCallback;
+            watcher.Stopped += this.stoppedCallback;
+        }
+
+        public void RemoveWatcherEventHandlers(BluetoothLEAdvertisementWatcher watcher)
+        {
+            watcher.Received -= this.receivedCallback;
+            this.receivedCallback = null;
+            watcher.Stopped -= this.stoppedCallback;
+            this.stoppedCallback = null;
+        }
+
+        #endregion
+
+        #region Notifications Handlers Handling
 
         public void AddValueChangedCallback(GattCharacteristic characteristic, TypedEventHandler<GattCharacteristic, GattValueChangedEventArgs> callback)
         {
@@ -51,6 +97,6 @@ namespace BleakBridge
             return GattCommunicationStatus.Success;
         }
 
-        
+
     }
 }
