@@ -170,12 +170,18 @@ class BleakClientWinRT(BaseBleakClient):
         self._notification_callbacks.clear()
 
         # Dispose all service components that we have requested and created.
+        for service in self.services:
+            service.obj.close()
         self.services = BleakGATTServiceCollection()
         self._services_resolved = False
 
         # Dispose of the BluetoothLEDevice and see that the connection status is now Disconnected.
         self._requester.remove_connection_status_changed(self._requester_connection_status_changed_token)
         self._requester_connection_status_changed_token = None
+        self._requester.close()
+        while self._requester.connection_status != BluetoothConnectionStatus.DISCONNECTED:
+            await asyncio.sleep(0.1)
+
         is_disconnected = self._requester.connection_status == BluetoothConnectionStatus.DISCONNECTED
         self._requester = None
 
