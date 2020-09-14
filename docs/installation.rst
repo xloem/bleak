@@ -46,10 +46,11 @@ Once you have a copy of the source, you can install it with:
 
     $ python setup.py install
 
-Building `BleakUWPBridge`
+Building ``BleakUWPBridge``
 -------------------------
 
-TBW.
+You should never have to do this. Regardless, build it just as you would any .NET project. Open the project in
+Visual Studio, hit build and it should work.
 
 .. _Github repo: https://github.com/hbldh/bleak
 .. _tarball: https://github.com/hbldh/bleak/tarball/master
