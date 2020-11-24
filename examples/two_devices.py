@@ -1,3 +1,5 @@
+import platform
+
 from bleak import BleakClient, discover, BleakError
 import asyncio
 
@@ -19,9 +21,9 @@ def run(addresses):
     loop.run_until_complete(tasks)
 
 
-async def connect_to_device(address, loop):
+async def connect_to_device(address):
     print("starting", address, "loop")
-    async with BleakClient(address, timeout=5.0) as client:
+    async with BleakClient(address) as client:
 
         print("connect to", address)
         try:
@@ -36,5 +38,7 @@ async def connect_to_device(address, loop):
 
 if __name__ == "__main__":
     run(
+        ["EF:A6:0D:2A:30:55", "24:71:89:CC:09:05"]
+        if platform.system() != "Darwin" else
         ["B9EA5233-37EF-4DD6-87A8-2A875E821C46", "F0CBEBD3-299B-4139-A9FC-44618C720157"]
     )

@@ -141,8 +141,8 @@ class BleakClientDotNet(BaseBleakClient):
 
         """
         # Try to find the desired device.
+        timeout = kwargs.get("timeout", self._timeout)
         if self._device_info is None:
-            timeout = kwargs.get("timeout", self._timeout)
             device = await BleakScannerDotNet.find_device_by_address(
                 self.address, timeout=timeout
             )
@@ -233,7 +233,7 @@ class BleakClientDotNet(BaseBleakClient):
             # This keeps the device connected until we dispose the session or
             # until we set MaintainConnection = False.
             self._session.MaintainConnection = True
-            await asyncio.wait_for(event.wait(), timeout=10)
+            await asyncio.wait_for(event.wait(), timeout=timeout)
         except BaseException:
             handle_disconnect()
             raise
