@@ -1,6 +1,6 @@
 import platform
 
-from bleak import BleakClient, discover, BleakError
+from bleak import BleakClient, BleakScanner
 import asyncio
 
 temperatureUUID = "45366e80-cf3a-11e1-9ab4-0002a5d5c51b"
@@ -13,22 +13,19 @@ def callback(sender, data):
     print(sender, data)
 
 
-def run(addresses):
-    loop = asyncio.get_event_loop()
-
-    tasks = asyncio.gather(*(connect_to_device(address) for address in addresses))
-
-    loop.run_until_complete(tasks)
+async def run(addresses):
+    scanner = BleakScanner()
+    devices = [await scanner.find_device_by_address(address) for address in addresses]
+    await asyncio.gather(*(connect_to_device(device) for device in devices))
 
 
 async def connect_to_device(address):
     print("starting", address, "loop")
-    async with BleakClient(address) as client:
-
+    async with BleakClient(address, timeout=20) as client:
         print("connect to", address)
         try:
             await client.start_notify(notify_uuid, callback)
-            await asyncio.sleep(10.0)
+            await asyncio.sleep(20.0)
             await client.stop_notify(notify_uuid)
         except Exception as e:
             print(e)
@@ -37,8 +34,10 @@ async def connect_to_device(address):
 
 
 if __name__ == "__main__":
-    run(
+    loop = asyncio.get_event_loop()
+    task = run(
         ["EF:A6:0D:2A:30:55", "24:71:89:CC:09:05"]
         if platform.system() != "Darwin" else
         ["B9EA5233-37EF-4DD6-87A8-2A875E821C46", "F0CBEBD3-299B-4139-A9FC-44618C720157"]
     )
+    loop.run_until_complete(task)

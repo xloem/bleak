@@ -75,9 +75,13 @@ async def connect_to_device(address: BLEDevice, notification_uuid: str):
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
+    # Send a list of addresses to connect to and corresponding array of uuids to start notifications on.
     loop.run_until_complete(
         run(
-            ["EF:A6:0D:2A:30:55", "24:71:89:CC:09:05"],
+            [
+                "EF:A6:0D:2A:30:55",
+                "24:71:89:CC:09:05"
+            ],
             [
                 "c9f60023-9f9b-fba4-5847-7fd701bf59f2",
                 "0000{0:x}-0000-1000-8000-00805f9b34fb".format(0xFFE1),
