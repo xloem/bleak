@@ -1,3 +1,5 @@
+package com.github.hbldh.bleak;
+
 import java.net.ConnectException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CancellationException;
@@ -11,50 +13,21 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothProfile;
 
 
-// most of this code can likely be removed or changed
-
 public final class PythonBluetoothGattCallback extends BluetoothGattCallback
 {
-    public static final class Status extends Exception
+    public interface Interface
     {
-        public final int code;
-        public Status(int code)
-        {
-            super(codeToString(code));
-            this.code = code;
-        }
-
-        public static String codeToString(int status)
-        {
-                switch (status) {
-                case BluetoothGatt.GATT_CONNECTION_CONGESTED:
-                    return "CONNECTION_CONGESTED";
-                case BluetoothGatt.GATT_FAILURE:
-                    return "FAILURE";
-                case BluetoothGatt.GATT_INSUFFICIENT_AUTHENTICATION:
-                    return "INSUFFICIENT_AUTHENTICATION";
-                case BluetoothGatt.GATT_INSUFFICIENT_ENCRYPTION:
-                    return "INSUFFICIENT_ENCRYPTION";
-                case BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH:
-                    return "INVALID_ATTRIBUTE_LENGTH";
-                case BluetoothGatt.GATT_INVALID_OFFSET:
-                    return "INVALID_OFFSET";
-                case BluetoothGatt.GATT_READ_NOT_PERMITTED:
-                    return "READ_NOT_PERMITTED";
-                default:
-                    return "UNRECOGNISED ERROR CODE";
-                }
-        }
+        public void onConnectionStateChange(int status, int newState);
+        public void onServicesDiscovered(int status);
     }
-
-    private CompletableFuture<BluetoothGatt> future;
-    private HashMap<UUID,Runnable> notifiees;
+    private Interface callback;
         
-    public PythonBluetoothGattCallback()
+    public PythonBluetoothGattCallback(Interface pythonCallback)
     {
-        reset();
+        callback = pythonCallback;
     }
 
+    /*
     public void subscribe(UUID uuid, Runnable runnable)
     {
         notifiees.put(uuid, runnable);
@@ -83,30 +56,21 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
             } catch(InterruptedException e) {}
         }
     }
+    */
 
     @Override
     public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState)
     {
-        if (status == 0) {
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
-                future.complete(gatt);
-            }
-        } else { // failure
-            if (newState != BluetoothProfile.STATE_CONNECTED) {
-                future.completeExceptionally(new Status(status));
-            }
-        }
+        callback.onConnectionStateChange(status, newState);
     }
 
     @Override
     public void onServicesDiscovered(BluetoothGatt gatt, int status)
     {
-        if (status == 0) {
-            future.complete(gatt);
-        } else {
-            future.completeExceptionally(new Status(status));
-        }
+        callback.onServicesDiscovered(status);
     }
+
+    /*
 
     @Override
     public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status)
@@ -126,4 +90,5 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
             notifiee.run();
         }
     }
+    */
 }

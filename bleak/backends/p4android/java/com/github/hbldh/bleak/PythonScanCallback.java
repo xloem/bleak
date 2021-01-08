@@ -1,9 +1,11 @@
+package com.github.hbldh.bleak;
+
 import java.util.List;
 
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 
-public class PythonScanCallback extends ScanCallback
+public final class PythonScanCallback extends ScanCallback
 {
     public interface Interface
     {

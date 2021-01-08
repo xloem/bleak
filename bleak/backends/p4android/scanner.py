@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from bleak.backends.scanner import BaseBleakScanner, AdvertisementData
 from bleak.backends.device import BLEDevice
@@ -11,9 +12,9 @@ class java:
     BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
     ScanCallback = autoclass('android.bluetooth.le.ScanCallback')
     ScanFilter = autoclass('android.bluetooth.le.ScanFilter')
-    ScanFilterBuilder = autoclass('android.bluetooth.le.ScanFilter.Builder')
+    ScanFilterBuilder = autoclass('android.bluetooth.le.ScanFilter$Builder')
     ScanSettings = autoclass('android.bluetooth.le.ScanSettings')
-    ScanSettingsBuilder = autoclass('android.bluetooth.le.ScanSettings.Builder')
+    ScanSettingsBuilder = autoclass('android.bluetooth.le.ScanSettings$Builder')
     List = autoclass('java.util.ArrayList')
     PythonScanCallback = autoclass('com.github.hbldh.bleak.PythonScanCallback')
 
@@ -46,7 +47,7 @@ class BleakScannerP4Android(BaseBleakScanner):
             if any(grantResults):
                 permission_acknowledged.set_result(grantResults)
             else:
-                permission_acknowledged.set_exception(BleakError("User denied access to " + str(permissions))
+                permission_acknowledged.set_exception(BleakError("User denied access to " + str(permissions)))
         request_permissions([
                 Permission.ACCESS_FINE_LOCATION,
                 Permission.ACCESS_COARS_LOCATION,
@@ -85,7 +86,7 @@ class BleakScannerP4Android(BaseBleakScanner):
         return [*self._devices.values()]
 
 class PythonScanCallback(PythonJavaClass):
-    __javainterfaces__ = ['PythonScanCallback$Interface']
+    __javainterfaces__ = ['com.github.hbldh.bleak.PythonScanCallback$Interface']
     __javacontext__ = 'app'
 
     _errors = {
@@ -108,12 +109,12 @@ class PythonScanCallback(PythonJavaClass):
     
     @java_method('(Landroid/bluetooth/le/ScanResult;)V')
     def onScanResult(self, result):
-        if not self.status.done()
+        if not self.status.done():
             self.status.set_result(True)
         device = result.getDevice()
         record = result.getScanRecord()
         advertisement = AdvertisementData(
-            local_name=record,getDeviceName(),
+            local_name=record.getDeviceName(),
             #manufacturer_data=record.getManufacturerSpecificData(), # SparseArray -> dict
             #service_data=record.getServiceData(), # Map<ParcelUuid,byte[]> -> dict
             #service_uuids=record.getServiceUuids(), # List<ParcelUuid> -> list,

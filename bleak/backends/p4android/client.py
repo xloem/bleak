@@ -20,8 +20,9 @@ class java:
     BluetoothGatt = autoclass('android.bluetooth.BluetoothGatt')
     BluetoothProfile = autoclass('android.bluetooth.BluetoothProfile')
     PythonActivity = autoclass('org.kivy.android.PythonActivity')
-    PythonBluetoothGattCallback = autoclass('PythonBluetoothGattCallback')
-    ExecutionException = autoclass('java.util.concurrent.ExecutionException')
+    activity = cast('android.app.Activity', PythonActivity.mActivity)
+    context = cast('android.content.Context', activity.getApplicationContext())
+    PythonBluetoothGattCallback = autoclass('com.github.hbldh.bleak.PythonBluetoothGattCallback')
 
 class BleakClientP4Android(BaseBleakClient):
     """A python-for-android Bleak Client
@@ -54,6 +55,8 @@ class BleakClientP4Android(BaseBleakClient):
             Boolean representing connection status.
 
         """
+        loop = asyncio.get_event_loop()
+
         self._adapter = java.BluetoothAdapter.getDefaultAdapter()
         self._device = self._adapter.getRemoteDevice(self.address)
 
@@ -62,3 +65,74 @@ class BleakClientP4Android(BaseBleakClient):
                 self.address
             )
         )
+        
+        callback = PythonBluetoothGattCallback(self, loop)
+        gatt = self._device.connectGatt(java.context, False, callback.java)
+        await callback.get()
+
+        if not gatt.discoverServices():
+            raise BleakError('failed to initiate service discovery')
+        await callback.get()
+
+class PythonBluetoothGattCallback(PythonJavaClass):
+    __javainterfaces__ = ['com.github.hbldh.bleak.PythonBluetoothGattCallback$Interface']
+    __javacontext__ = 'app'
+
+    _status_codes = {
+        getattr(java.BluetoothGatt, name): name
+        for name in (
+            'GATT_SUCCESS',
+            'GATT_READ_NOT_PERMITTED',
+            'GATT_WRITE_NOT_PERMITTED',
+            'GATT_REQUEST_NOT_SUPPORTED',
+            'GATT_INSUFFICIENT_AUTHENTICATION',
+            'GATT_INVALID_OFFSET',
+            'GATT_INVALID_ATTRIBUTE_LENGTH',
+            'GATT_INSUFFICIENT_ENCRYPTION',
+            'GATT_CONNECTION_CONGESTED',
+            'GATT_FAILURE',
+        )}
+    GATT_SUCCESS = java.BluetoothGatt.GATT_SUCCESS
+
+    _connection_states = {
+        getattr(java.BluetoothGatt, name): name
+        for name in (
+            'STATE_DISCONNECTED',
+            'STATE_CONNECTING',
+            'STATE_CONNECTED',
+            'STATE_DISCONNECTING'
+        )}
+
+    def __init__(self, client, loop):
+        self._client = client
+        self._loop = loop
+        self.java = java.PythonBluetoothGattCallback(self)
+        self.results = asyncio.Queue()
+
+    async def get(self):
+        return await await self.results.get()
+
+    async def expect(self, *expected):
+        results = self.get()
+        results.
+        if source != expected_source:
+            raise BleakException('Expected', expected_source, 'got', source, *result)
+        return result
+        
+    def _result(status, source, *data):
+        future = self._loop.create_future()
+        if status == PythonBluetoothGattCallback.GATT_SUCCESS:
+            future.set_result((source, *data))
+        else:
+            status = PythonBluetoothGattCallback._status_codes[status]
+            future.set_exception(BleakException(source, status, *data))
+        self.results.put(future)
+
+    @java_method('(II)V')
+    def onConnectionStateChange(status, state):
+        state = PythonBluetoothGattCallback._connection_states[new_state]
+        self._result(status, 'onConnectionStateChange', state, state)
+
+    @java_method('(I)V')
+    def onServicesDiscovered(status):
+        self._result(status, 'onServicesDiscovered')

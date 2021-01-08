@@ -40,7 +40,7 @@ class BleakRecipe(PythonRecipe):
         #destdir = join(self.ctx.bootstrap.distribution.dist_dir, 'src', 'main', 'java')
         destdir = self.ctx.javaclass_dir
         #os.makedirs(destdir, exist_ok=True)
-        path = join(self.get_build_dir(arch.arch), 'bleak', 'backends', 'p4android','java')
+        path = join(self.get_build_dir(arch.arch), 'bleak', 'backends', 'p4android', 'java', '.')
 
         shprint(sh.cp, '-a', path, destdir)
 
