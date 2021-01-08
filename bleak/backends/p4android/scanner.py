@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import List
 
 from bleak.backends.scanner import BaseBleakScanner, AdvertisementData
 from bleak.backends.device import BLEDevice
@@ -25,7 +26,7 @@ class BleakScannerP4Android(BaseBleakScanner):
 
     Keyword Args:
         adapter (str): Bluetooth adapter to use for discovery. [ignored]
-        filters (dict): A dict of filters to be applied on discovery.
+        filters (dict): A dict of filters to be applied on discovery. [unimplemented]
 
     """
 
@@ -50,7 +51,7 @@ class BleakScannerP4Android(BaseBleakScanner):
                 permission_acknowledged.set_exception(BleakError("User denied access to " + str(permissions)))
         request_permissions([
                 Permission.ACCESS_FINE_LOCATION,
-                Permission.ACCESS_COARS_LOCATION,
+                Permission.ACCESS_COARSE_LOCATION,
                 'android.permission.ACCESS_BACKGROUND_LOCATION'],
             handle_permissions)
         await permission_acknowledged
@@ -81,6 +82,9 @@ class BleakScannerP4Android(BaseBleakScanner):
 
     async def stop(self):
         self._scanner.stopScan(self._android_callback)
+
+    async def set_scanning_filter(self, **kwargs):
+        self._filters = kwargs.get("filters", {})
 
     async def get_discovered_devices(self) -> List[BLEDevice]:
         return [*self._devices.values()]

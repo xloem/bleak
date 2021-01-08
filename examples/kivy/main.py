@@ -14,7 +14,7 @@ from android.permissions import request_permissions, Permission
 class MyApp(App):
 
     def build(self):
-        scanner = sync(bleak.BleakScanner())
+        scanner = sync.methods(bleak.BleakScanner())
         scanned_devices = scanner.discover(5)
         if len(scanned_devices) == 0:
             print('no devices found')

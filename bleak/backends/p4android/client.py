@@ -67,12 +67,7 @@ class BleakClientP4Android(BaseBleakClient):
         )
         
         callback = PythonBluetoothGattCallback(self, loop)
-        gatt = self._device.connectGatt(java.context, False, callback.java)
-        await callback.get()
-
-        if not gatt.discoverServices():
-            raise BleakError('failed to initiate service discovery')
-        await callback.get()
+        await callback.connect()
 
 class PythonBluetoothGattCallback(PythonJavaClass):
     __javainterfaces__ = ['com.github.hbldh.bleak.PythonBluetoothGattCallback$Interface']
@@ -92,10 +87,11 @@ class PythonBluetoothGattCallback(PythonJavaClass):
             'GATT_CONNECTION_CONGESTED',
             'GATT_FAILURE',
         )}
+
     GATT_SUCCESS = java.BluetoothGatt.GATT_SUCCESS
 
     _connection_states = {
-        getattr(java.BluetoothGatt, name): name
+        getattr(java.BluetoothProfile, name): name
         for name in (
             'STATE_DISCONNECTED',
             'STATE_CONNECTING',
@@ -103,21 +99,33 @@ class PythonBluetoothGattCallback(PythonJavaClass):
             'STATE_DISCONNECTING'
         )}
 
-    def __init__(self, client, loop):
+    def __init__(self, client, loop, device):
         self._client = client
         self._loop = loop
+        self._device = device
         self.java = java.PythonBluetoothGattCallback(self)
         self.results = asyncio.Queue()
 
+    async def connect(self):
+        self.gatt = self._device.connectGatt(java.context, False, self.java)
+        await self.expect('onConnectionStateChange', 'STATE_CONNECTED')
+        if not self.gatt.discoverServices():
+            raise BleakError('failed to initiate service discovery')
+        await self.expect('onServicesDiscovered')
+        services = self.gatt.getServices()
+        for i in range(len(services)):
+            uuid = services[i].getUuid()
+            
+            pass
+
     async def get(self):
-        return await await self.results.get()
+        return await (await self.results.get())
 
     async def expect(self, *expected):
-        results = self.get()
-        results.
-        if source != expected_source:
-            raise BleakException('Expected', expected_source, 'got', source, *result)
-        return result
+        results = await self.get()
+        if results[:len(expected)] != expected[:]:
+            raise BleakException('Expected', expected, 'got', results)
+        return results[len(expected):]
         
     def _result(status, source, *data):
         future = self._loop.create_future()

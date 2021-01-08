@@ -71,7 +71,6 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
     }
 
     /*
-
     @Override
     public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status)
     {
