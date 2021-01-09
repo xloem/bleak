@@ -11,18 +11,25 @@ from bleak.backends.service import BleakGATTServiceCollection
 from bleak.exc import BleakError
 from bleak.backends.client import BaseBleakClient
 
+from android.broadcast import BroadcastReceiver
 from jnius import autoclass, cast, PythonJavaClass, java_method
 
 logger = logging.getLogger(__name__)
 
 class java:
     BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
+    BluetoothDevice = autoclass('android.bluetooth.BluetoothDevice')
     BluetoothGatt = autoclass('android.bluetooth.BluetoothGatt')
     BluetoothProfile = autoclass('android.bluetooth.BluetoothProfile')
     PythonActivity = autoclass('org.kivy.android.PythonActivity')
     activity = cast('android.app.Activity', PythonActivity.mActivity)
     context = cast('android.content.Context', activity.getApplicationContext())
     PythonBluetoothGattCallback = autoclass('com.github.hbldh.bleak.PythonBluetoothGattCallback')
+
+    ACTION_BOND_STATE_CHANGED = java.BluetoothDevice.ACTION_BOND_STATE_CHANGED
+    BOND_BONDED = java.BluetoothDevice.BOND_BONDED
+    BOND_BONDING = java.BluetoothDevice.BOND_BONDING
+    BOND_NONE = java.BluetoothDevice.BOND_NONE
 
 class BleakClientP4Android(BaseBleakClient):
     """A python-for-android Bleak Client
@@ -42,6 +49,7 @@ class BleakClientP4Android(BaseBleakClient):
         super(BleakClientBlueZDBus, self).__init__(address_or_ble_device, **kwargs)
         # kwarg "device" is for backwards compatibility
         self._adapter = kwargs.get("adapter", kwargs.get("device", None))
+        self._gatt = None
 
     # Connectivity methods
 
@@ -58,7 +66,92 @@ class BleakClientP4Android(BaseBleakClient):
         self._device = self._adapter.getRemoteDevice(self.address)
         
         callback = PythonBluetoothGattCallback(self, loop)
-        await callback.connect()
+        self._gatt = await callback.connect()
+
+        await self.get_services()
+        return True
+
+    async def disconnect(self) -> bool:
+        """Disconnect from the specified GATT server.
+
+        Returns:
+            Boolean representing if device is disconnected.
+
+        """
+        logger.debug("Disconnecting from BLE device...")
+        if self._gatt is None:
+            # No connection exists. Either one hasn't been created or
+            # we have already called disconnect and closed the gatt
+            # connection.
+            return True
+
+        # Try to disconnect the actual device/peripheral
+        try:
+            self._gatt.disconnect()
+        except Exception as e:
+            logger.error("Attempt to disconnect device failed: {0}".format(e))
+
+        is_disconnected = not await self.is_connected()
+
+        # Reset all stored services.
+        self.services = BleakGATTServiceCollection()
+        self._services_resolved = False
+
+        return is_disconnected
+
+    async def pair(self, *args, **kwargs) -> bool:
+        """Pair with the peripheral.
+
+        You can use ConnectDevice method if you already know the MAC address of the device.
+        Else you need to StartDiscovery, Trust, Pair and Connect in sequence.
+
+        Returns:
+            Boolean regarding success of pairing.
+
+        """
+        loop = asyncio.get_event_loop()
+
+        # See if it is already paired.
+        bond_state = self._device.getBondState()
+        if bond_state == java.BOND_BONDED:
+            return True
+        elif bond_state == java.BOND_NONE:
+            logger.debug(
+                "Pairing to BLE device @ {0}".format(self.address)
+            )
+            if not self._device.createBond():
+                raise BleakError(
+                    "Could not initiate bonding with device @ {0}".format(self.address)
+                )
+
+        # boding is likely now in progress (state == BOND_BONDING)
+        # register for the java.ACTION_BOND_STATE_CHANGED intent using BroadcastReceiver to wait for completion
+        # new bond state is additionally included in intent
+
+    # GATT services methods
+
+    async def get_services(self) -> BleakGATTServiceCollection:
+        """Get all services registered for this GATT server.
+
+        Returns:
+           A :py:class:`bleak.backends.service.BleakGATTServiceCollection` with this device's services tree.
+
+        """
+        if self._services_resolved:
+            return self.services
+
+        logger.debug("Get Services...")
+        services = self._gatt.getServices()
+        for i in range(len(services)):
+            service = BleakGATTServiceP4Android(services[i])
+            self.services.add_service(service)
+            for characteristic in service.characteristics:
+                self.services.add_characteristic(characteristic)
+                for descriptor in characteristic.descriptors:
+                    self.services.add_descriptor(descriptor)
+
+        self._services_resolved = True
+        return self.services
 
 class PythonBluetoothGattCallback(PythonJavaClass):
     __javainterfaces__ = ['com.github.hbldh.bleak.PythonBluetoothGattCallback$Interface']
@@ -106,27 +199,8 @@ class PythonBluetoothGattCallback(PythonJavaClass):
         if not self.gatt.discoverServices():
             raise BleakError('failed to initiate service discovery')
         await self.expect('onServicesDiscovered')
-        await self.get_services()
-        return True
 
-    # GATT services methods
-
-    async def get_services(self) -> BleakGATTServiceCollection:
-        """Get all services registered for this GATT server.
-
-        Returns:
-           A :py:class:`bleak.backends.service.BleakGATTServiceCollection` with this device's services tree.
-
-        """
-        if self._services_resolved:
-            return self.services
-
-        logger.debug("Get Services...")
-        services = self.gatt.getServices()
-        for i in range(len(services)):
-            uuid = services[i].getUuid()
-            
-            pass
+        return self.gatt
 
     async def get(self):
         return await (await self.results.get())
