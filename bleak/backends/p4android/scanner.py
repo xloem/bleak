@@ -46,9 +46,9 @@ class BleakScannerP4Android(BaseBleakScanner):
         permission_acknowledged = loop.create_future()
         def handle_permissions(permissions, grantResults):
             if any(grantResults):
-                permission_acknowledged.set_result(grantResults)
+                loop.call_soon_threadsafe(permission_acknowledged.set_result, grantResults)
             else:
-                permission_acknowledged.set_exception(BleakError("User denied access to " + str(permissions)))
+                loop.call_soon_threadsafe(permission_acknowledged.set_exception(BleakError("User denied access to " + str(permissions))))
         request_permissions([
                 Permission.ACCESS_FINE_LOCATION,
                 Permission.ACCESS_COARSE_LOCATION,
@@ -56,7 +56,9 @@ class BleakScannerP4Android(BaseBleakScanner):
             handle_permissions)
         await permission_acknowledged
 
-        self._adapter = java.BluetoothAdapter.getDefaultAdaper()
+        self._adapter = java.BluetoothAdapter.getDefaultAdapter()
+        if self._adapter is None:
+            raise BleakError('Bluetooth is not supported on this hardware platform')
 
         callback = PythonScanCallback(self, loop)
         self._android_callback = java.PythonScanCallback(callback)
@@ -78,7 +80,7 @@ class BleakScannerP4Android(BaseBleakScanner):
                 build(),
             self._android_callback)
 
-        await callback.status
+        await asyncio.wait_for(callback.status, timeout=0.1)
 
     async def stop(self):
         self._scanner.stopScan(self._android_callback)

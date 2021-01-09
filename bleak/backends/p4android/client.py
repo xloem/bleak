@@ -48,9 +48,6 @@ class BleakClientP4Android(BaseBleakClient):
     async def connect(self, **kwargs) -> bool:
         """Connect to the specified GATT server.
 
-        Keyword Args:
-            timeout (float): Timeout for required ``BleakScanner.find_device_by_address`` call. Defaults to 10.0.
-
         Returns:
             Boolean representing connection status.
 
@@ -59,12 +56,6 @@ class BleakClientP4Android(BaseBleakClient):
 
         self._adapter = java.BluetoothAdapter.getDefaultAdapter()
         self._device = self._adapter.getRemoteDevice(self.address)
-
-        logger.debug(
-            "Connecting to BLE device @ {0}".format(
-                self.address
-            )
-        )
         
         callback = PythonBluetoothGattCallback(self, loop)
         await callback.connect()
@@ -107,11 +98,30 @@ class PythonBluetoothGattCallback(PythonJavaClass):
         self.results = asyncio.Queue()
 
     async def connect(self):
+        logger.debug("Connecting to BLE device @ {0}".format(self.address))
         self.gatt = self._device.connectGatt(java.context, False, self.java)
         await self.expect('onConnectionStateChange', 'STATE_CONNECTED')
+        logger.debug("Connection succesful.")
+
         if not self.gatt.discoverServices():
             raise BleakError('failed to initiate service discovery')
         await self.expect('onServicesDiscovered')
+        await self.get_services()
+        return True
+
+    # GATT services methods
+
+    async def get_services(self) -> BleakGATTServiceCollection:
+        """Get all services registered for this GATT server.
+
+        Returns:
+           A :py:class:`bleak.backends.service.BleakGATTServiceCollection` with this device's services tree.
+
+        """
+        if self._services_resolved:
+            return self.services
+
+        logger.debug("Get Services...")
         services = self.gatt.getServices()
         for i in range(len(services)):
             uuid = services[i].getUuid()
