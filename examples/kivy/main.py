@@ -20,16 +20,17 @@ def pump(seconds):
 class MyApp(App):
 
     def build(self):
-        print('build')
         scanner = bleak.BleakScanner()
         try:
+            print('scanning ...')
             scanned_devices = acall(scanner.discover(1))
+            print('scanned')
             if len(scanned_devices) == 0:
                 print('no devices found')
                 return Label(text = 'no devices found')
             summary = ''
             for scanned_device in scanned_devices:
-                summary += scanned_device.address + scanned_device.name + ':\n'
+                summary += scanned_device.address + ' ' + scanned_device.name + ':\n'
                 #scanned_device.connect()
                 #scanned_device.discover()
             

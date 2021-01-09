@@ -10,6 +10,7 @@ import java.util.UUID;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
 import android.bluetooth.BluetoothProfile;
 
 
@@ -47,30 +48,30 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
     @Override
     public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status)
     {
-        callback.onCharacteristicRead(characterististic.getInstanceId(), status, characteristic.getValue())
+        callback.onCharacteristicRead(characteristic.getInstanceId(), status, characteristic.getValue());
     }
 
     @Override
     public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status)
     {
-        callback.onCharacteristicWrite(characterististic.getInstanceId(), status)
+        callback.onCharacteristicWrite(characteristic.getInstanceId(), status);
     }
 
     @Override
     public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic)
     {
-        callback.onCharacteristicChanged(characterististic.getInstanceId(), characteristic.getValue())
+        callback.onCharacteristicChanged(characteristic.getInstanceId(), characteristic.getValue());
     }
 
     @Override
     public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status)
     {
-        callback.onDescriptorRead(descriptor.getUuid().toString(), status, descriptor.getValue())
+        callback.onDescriptorRead(descriptor.getUuid().toString(), status, descriptor.getValue());
     }
 
     @Override
     public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status)
     {
-        callback.onDescriptorWrite(descriptor.getUuid().toString(), status)
+        callback.onDescriptorWrite(descriptor.getUuid().toString(), status);
     }
 }

@@ -6,18 +6,18 @@ from bleak.backends.descriptor import BleakGATTDescriptor
 
 from jnius import autoclass
 
-class java:
+class _java:
     BluetoothGattCharacteristic = autoclass('android.bluetooth.BluetoothGattCharacteristic')
 
 _GattCharacteristicsFlagsEnum = {
-    BluetoothGattCharacteristic.PROPERTY_BROADCAST: 'broadcast',
-    BluetoothGattCharacteristic.PROPERTY_EXTENDED_PROPS: 'extended-properties',
-    BluetoothGattCharacteristic.PROPERTY_INDICATE: 'indicate',
-    BluetoothGattCharacteristic.PROPERTY_NOTIFY: 'notify',
-    BluetoothGattCharacteristic.PROPERTY_READ: 'read',
-    BluetoothGattCharacteristic.PROPERTY_SIGNED_WRITE: 'authenticated-signed-writes',
-    BluetoothGattCharacteristic.PROPERTY_WRITE: 'write',
-    BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE: 'write-without-response',
+    _java.BluetoothGattCharacteristic.PROPERTY_BROADCAST: 'broadcast',
+    _java.BluetoothGattCharacteristic.PROPERTY_EXTENDED_PROPS: 'extended-properties',
+    _java.BluetoothGattCharacteristic.PROPERTY_INDICATE: 'indicate',
+    _java.BluetoothGattCharacteristic.PROPERTY_NOTIFY: 'notify',
+    _java.BluetoothGattCharacteristic.PROPERTY_READ: 'read',
+    _java.BluetoothGattCharacteristic.PROPERTY_SIGNED_WRITE: 'authenticated-signed-writes',
+    _java.BluetoothGattCharacteristic.PROPERTY_WRITE: 'write',
+    _java.BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE: 'write-without-response',
 }
 
 class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):

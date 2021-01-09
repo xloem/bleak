@@ -1,7 +1,7 @@
 from typing import List
 
 from bleak.backends.service import BleakGATTService
-from bleak.backends.bluezdbus.characteristic import BleakGATTCharacteristicP4Android
+from bleak.backends.p4android.characteristic import BleakGATTCharacteristicP4Android
 
 
 class BleakGATTServiceP4Android(BleakGATTService):
@@ -24,6 +24,6 @@ class BleakGATTServiceP4Android(BleakGATTService):
         return self.__uuid
 
     @property
-    def characteristics(self) -> List[BleakGATTCharacteristicBlueZDBus]:
+    def characteristics(self) -> List[BleakGATTCharacteristicP4Android]:
         """List of characteristics for this service"""
         return self.__characteristics
