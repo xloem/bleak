@@ -10,6 +10,7 @@ class BleakGATTServiceP4Android(BleakGATTService):
     def __init__(self, java):
         super().__init__(java)
         self.__uuid = self.obj.getUuid().toString()
+        self.__handle = self.obj.getInstanceId()
 
         characteristics = self.obj.getCharacteristics()
         numCharacteristics = len(characteristics)

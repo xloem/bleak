@@ -19,6 +19,11 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
     {
         public void onConnectionStateChange(int status, int newState);
         public void onServicesDiscovered(int status);
+        public void onCharacteristicChanged(int handle, byte[] value);
+        public void onCharacteristicRead(int handle, int status, byte[] value);
+        public void onCharacteristicWrite(int handle, int status);
+        public void onDescriptorRead(String uuid, int status, byte[] value);
+        public void onDescriptorWrite(String uuid, int status);
     }
     private Interface callback;
         
@@ -26,37 +31,6 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
     {
         callback = pythonCallback;
     }
-
-    /*
-    public void subscribe(UUID uuid, Runnable runnable)
-    {
-        notifiees.put(uuid, runnable);
-    }
-
-    public void unsubscribe(UUID uuid)
-    {
-        notifiees.remove(uuid);
-    }
-
-    public void reset()
-    {
-        future = new CompletableFuture<BluetoothGatt>();
-    }
-
-    public BluetoothGatt waitFor() throws ExecutionException, CancellationException
-    {
-        // this approach of wrapping futures could likely be heavily simplified by
-        // somebody more familiar with java or python; please do so if interested.
-        // i noticed java has a 'synchronized' primitive, and inherent notify/wait
-        // methods on every object.  or the concept could be moved into python,
-        // which would be easier if PythonJavaClass provided for inheritance.
-        while (true) {
-            try {
-                return future.get();
-            } catch(InterruptedException e) {}
-        }
-    }
-    */
 
     @Override
     public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState)
@@ -70,24 +44,33 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
         callback.onServicesDiscovered(status);
     }
 
-    /*
+    @Override
+    public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status)
+    {
+        callback.onCharacteristicRead(characterististic.getInstanceId(), status, characteristic.getValue())
+    }
+
     @Override
     public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status)
     {
-        if (status == 0) {
-            future.complete(gatt);
-        } else {
-            future.completeExceptionally(new Status(status));
-        }
+        callback.onCharacteristicWrite(characterististic.getInstanceId(), status)
     }
 
     @Override
     public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic)
     {
-        Runnable notifiee = notifiees.getOrDefault(characteristic.getUuid(), null);
-        if (notifiee != null) {
-            notifiee.run();
-        }
+        callback.onCharacteristicChanged(characterististic.getInstanceId(), characteristic.getValue())
     }
-    */
+
+    @Override
+    public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status)
+    {
+        callback.onDescriptorRead(descriptor.getUuid().toString(), status, descriptor.getValue())
+    }
+
+    @Override
+    public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status)
+    {
+        callback.onDescriptorWrite(descriptor.getUuid().toString(), status)
+    }
 }

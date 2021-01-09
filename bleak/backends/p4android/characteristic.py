@@ -26,17 +26,17 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     def __init__(self, java, service_uuid: str):
         super(BleakGATTCharacteristicP4Android, self).__init__(java)
         self.__uuid = self.obj.getUuid().toString()
-        self.__properties = self.obj.getProperties()
+        self.__handle = self.obj.getInstanceId()
         self.__service_uuid = service_uuid
 
         self.__properties = [
             name
             for flag, name
             in _GattCharacteristicsFlagsEnum.items()
-            if flag & self.__properties
+            if flag & self.obj.getProperties()
         ]
 
-        descriptors = self.__java.getDescriptors()
+        descriptors = self.obj.getDescriptors()
         numDescriptors = len(descriptors)
         self.__descriptors = [
             BleakGATTDescriptorP4Android(descriptors[index], self.__uuid)
@@ -50,7 +50,7 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     @property
     def handle(self) -> int:
         """The handle of this characteristic"""
-        raise BleakError('The Android Bluetooth API does not provide access to handles.')
+        return self.__handle
 
     @property
     def uuid(self) -> str:
@@ -73,7 +73,7 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     ) -> Union[BleakGATTDescriptor, None]:
         """Get a descriptor by UUID (str or uuid.UUID)"""
         if isinstance(specifier, int):
-            raise BleakError('The Android Bluetooth API does not provide access to handles.')
+            raise BleakError('The Android Bluetooth API does not provide access to descriptor handles.')
 
         matches = [descriptor
             for descriptor in self.descriptors

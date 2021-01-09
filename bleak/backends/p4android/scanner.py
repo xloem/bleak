@@ -111,12 +111,12 @@ class PythonScanCallback(PythonJavaClass):
 
     @java_method('(I)V')
     def onScanFailed(self, errorCode):
-        self.status.set_exception(BleakError(self._errors[errorCode]()))
+        self._loop.call_soon_threadsafe(self.status.set_exception, BleakError(self._errors[errorCode]()))
     
     @java_method('(Landroid/bluetooth/le/ScanResult;)V')
     def onScanResult(self, result):
         if not self.status.done():
-            self.status.set_result(True)
+            self._loop.call_soon_threadsafe(self.status.set_result, True)
         device = result.getDevice()
         record = result.getScanRecord()
         advertisement = AdvertisementData(
@@ -135,4 +135,4 @@ class PythonScanCallback(PythonJavaClass):
         )
         self._scanner._devices[device.address] = device
         if self._scanner._callback:
-            self._loop.call_soon(self._scanner._callback, device, advertisement)
+            self._loop.call_soon_threadsafe(self._scanner._callback, device, advertisement)
