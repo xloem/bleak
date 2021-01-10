@@ -69,22 +69,35 @@ class ExampleApp(App):
                             serial='273e0001-4c4d-454d-96be-f03bac821358'
                             channel='273e0003-4c4d-454d-96be-f03bac821358'
                             # subscribe to both
-                            #def serial_data(handle, data):
-                            #    self.line(data.decode('utf-8'))
-                            #self.line('starting notify 1')
-                            #await client.start_notify(serial, serial_data)
-                            #future = asyncio.get_event_loop().create_future()
-                            #def channel_data(handle, data):
-                            #    self.line(data)
-                            #    future.set_result(True)
-                            #self.line('starting notify 2')
-                            #await client.start_notify(channel, channel_data)
+                            def serial_data(handle, data):
+                                self.line(data.decode('utf-8'))
+                            self.line('starting notify 1')
+                            await client.start_notify(serial, serial_data)
+                            future = asyncio.get_event_loop().create_future()
+                            def channel_data(handle, data):
+                                self.line(data)
+                                future.set_result(True)
+                            self.line('starting notify 2')
+                            await client.start_notify(channel, channel_data)
                             self.line('writing data ' + str(client))
+                            for char in '\x03v1\n':
+                                data = bytearray([ord(char)])
+                                self.line('writing ' + str(data))
+                                await client.write_gatt_char(serial, data)
                             for char in '\x02s\n':
                                 data = bytearray([ord(char)])
                                 self.line('writing ' + str(data))
                                 await client.write_gatt_char(serial, data)
+                            for char in '\x04p63\n':
+                                data = bytearray([ord(char)])
+                                self.line('writing ' + str(data))
+                                await client.write_gatt_char(serial, data)
+                            for char in '\x02d\n':
+                                data = bytearray([ord(char)])
+                                self.line('writing ' + str(data))
+                                await client.write_gatt_char(serial, data)
                             self.line('done')
+                            await future
 
                         await client.disconnect()
                     except bleak.exc.BleakError as e:

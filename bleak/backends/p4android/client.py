@@ -27,6 +27,7 @@ class _java:
     BluetoothDevice = autoclass('android.bluetooth.BluetoothDevice')
     BluetoothGatt = autoclass('android.bluetooth.BluetoothGatt')
     BluetoothGattCharacteristic = autoclass('android.bluetooth.BluetoothGattCharacteristic')
+    BluetoothGattDescriptor = autoclass('android.bluetooth.BluetoothGattDescriptor')
     BluetoothProfile = autoclass('android.bluetooth.BluetoothProfile')
     PythonActivity = autoclass('org.kivy.android.PythonActivity')
     activity = cast('android.app.Activity', PythonActivity.mActivity)
@@ -49,6 +50,9 @@ class _java:
     WRITE_TYPE_NO_RESPONSE = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
     WRITE_TYPE_DEFAULT = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
     WRITE_TYPE_SIGNED = BluetoothGattCharacteristic.WRITE_TYPE_SIGNED
+    DISABLE_NOTIFICATION_VALUE = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+    ENABLE_NOTIFICATION_VALUE = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+    ENABLE_INDICATION_VALUE = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
 
     GATT_STATUS_NAMES = {
         # https://developer.android.com/reference/android/bluetooth/BluetoothGatt
@@ -363,7 +367,7 @@ class BleakClientP4Android(BaseBleakClient):
         value = bytearray(value)
         logger.debug(
             "Read Characteristic {0} | {1}: {2}".format(
-                characteristic.uuid, self.address, value
+                characteristic.uuid, characteristic.handle, value
             )
         )
         return value
@@ -407,7 +411,9 @@ class BleakClientP4Android(BaseBleakClient):
         value = bytearray(value)
 
         logger.debug(
-            "Read Descriptor {0} | {1}: {2}".format(descriptor.uuid, self.address, value)
+            "Read Descriptor {0} | {1}: {2}".format(
+                descriptor.uuid, descriptor.handle, value
+            )
         )
 
         return value
@@ -482,7 +488,7 @@ class BleakClientP4Android(BaseBleakClient):
 
         logger.debug(
             "Write Characteristic {0} | {1}: {2}".format(
-                characteristic.uuid, self.address, data
+                characteristic.uuid, characteristic.handle, data
             )
         )
 
@@ -508,7 +514,9 @@ class BleakClientP4Android(BaseBleakClient):
         if not descriptor:
             raise BleakError("Descriptor {0} was not found!".format(desc_specifier))
 
+        print('preparing to write', data)
         descriptor.obj.setValue(data)
+        print('writing', descriptor.obj.getValue().tolist())
         writestate = self.__callbacks.prepare(('onDescriptorWrite', descriptor.uuid))
         if not self.__gatt.writeDescriptor(descriptor.obj):
             raise BleakError(
@@ -519,7 +527,7 @@ class BleakClientP4Android(BaseBleakClient):
         await self.__callbacks.expect(writestate)
 
         logger.debug(
-            "Write Descriptor {0} | {1}: {2}".format(handle, self.address, data)
+            "Write Descriptor {0} | {1}: {2}".format(descriptor.uuid, descriptor.handle, data)
         )
 
     async def start_notify(
@@ -550,6 +558,8 @@ class BleakClientP4Android(BaseBleakClient):
         else:
             characteristic = char_specifier
 
+        print('start_notify', characteristic, callback)
+
         if not characteristic:
             raise BleakError(
                 "Characteristic with UUID {0} could not be found!".format(
@@ -557,14 +567,18 @@ class BleakClientP4Android(BaseBleakClient):
                 )
             )
 
+        self._subscriptions[characteristic.handle] = callback
+
         if not self.__gatt.setCharacteristicNotification(characteristic.obj, True):
             raise BleakError(
                 "Failed to enable notification for characteristic {0}".format(
                     characteristic.uuid
                 )
             )
+        
+        await self.write_gatt_descriptor(characteristic.notification_descriptor, _java.ENABLE_NOTIFICATION_VALUE)
 
-        self._subscriptions[characteristic.handle] = callback
+        print('enabled notification')
 
     async def stop_notify(
         self,
@@ -584,6 +598,8 @@ class BleakClientP4Android(BaseBleakClient):
             characteristic = char_specifier
         if not characteristic:
             raise BleakError("Characteristic {} not found!".format(char_specifier))
+        
+        await self.write_gatt_descriptor(characteristic.notification_descriptor, _java.DISABLE_NOTIFICATION_VALUE)
 
         if not self.__gatt.setCharacteristicNotification(characteristic.obj, False):
             raise BleakError(
@@ -698,11 +714,13 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
 
     @java_method('(I[B)V')
     def onCharacteristicChanged(self, handle, value):
+        print('onCharacteristicChanged')
+        print(handle, value)
         self._loop.call_soon_threadsafe(self._client._dispatch_notification, handle, value)
 
     @java_method('(II[B)V')
     def onCharacteristicRead(self, handle, status, value):
-        self._result_state_threadsafe(status, ('onCharacteristicRead', handle), value)
+        self._result_state_threadsafe(status, ('onCharacteristicRead', handle), bytes(value.tolist()))
 
     @java_method('(II)V')
     def onCharacteristicWrite(self, handle, status):
@@ -710,7 +728,7 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
     
     @java_method('(Ljava/lang/String;I[B)V')
     def onDescriptorRead(self, uuid, status, value):
-        self._result_state_threadsafe(status, ('onDescriptorRead', uuid), value)
+        self._result_state_threadsafe(status, ('onDescriptorRead', uuid), bytes(value.tolist()))
 
     @java_method('(Ljava/lang/String;I)V')
     def onDescriptorWrite(self, uuid, status):

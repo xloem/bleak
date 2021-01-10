@@ -8,6 +8,7 @@ from jnius import autoclass
 
 class _java:
     BluetoothGattCharacteristic = autoclass('android.bluetooth.BluetoothGattCharacteristic')
+
     CHARACTERISTIC_PROPERTY_DBUS_NAMES = {
         BluetoothGattCharacteristic.PROPERTY_BROADCAST: 'broadcast',
         BluetoothGattCharacteristic.PROPERTY_EXTENDED_PROPS: 'extended-properties',
@@ -19,6 +20,8 @@ class _java:
         BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE: 'write-without-response',
     }
 
+    NOTIFICATION_DESCRIPTOR_UUID = "00002902-0000-1000-8000-00805f9b34fb";
+
 class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     """GATT Characteristic implementation for the python-for-android backend"""
 
@@ -28,6 +31,7 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
         self.__handle = self.obj.getInstanceId()
         self.__service_uuid = service_uuid
         self.__descriptors = []
+        self.__notification_descriptor = None
 
         self.__properties = [
             name
@@ -82,3 +86,10 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
         Should not be used by end user, but rather by `bleak` itself.
         """
         self.__descriptors.append(descriptor)
+        if descriptor.uuid == _java.NOTIFICATION_DESCRIPTOR_UUID:
+            self.__notification_descriptor = descriptor
+
+    @property
+    def notification_descriptor(self) -> BleakGATTDescriptor:
+        """The notification descriptor.  Mostly needed by `bleak`, not by end user"""
+        return self.__notification_descriptor
