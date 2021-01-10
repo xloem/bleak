@@ -31,14 +31,15 @@ class MyApp(App):
             summary = ''
             for scanned_device in scanned_devices:
                 summary += scanned_device.address + ' ' + scanned_device.name + ':\n'
-                #scanned_device.connect()
-                #scanned_device.discover()
-            
-                #for service in scanned_device.services.values():
-                #    summary += '  service ' + str(service.uuid) + '\n'
-                #for characteristic in scanned_device.characteristics.values():
-                #    summary += '  characteristic ' + str(characteristic.uuid) + '\n'
-                #print(summary)
+                client = bleak.BleakClient(scanned_device.address)
+                acall(client.connect())
+                services = client.get_services()
+                for service in services.services.values():
+                    summary += '  service ' + service.uuid + '\n'
+                    for characteristic in service.characteristics:
+                        summary += '  characteristic ' + characteristic.uuid + '\n'
+                acall(client.disconnect())
+            print(summary)
         except bleak.exc.BleakError as e:
             summary = str(e)
         return Label(text = summary, font_size='10sp')

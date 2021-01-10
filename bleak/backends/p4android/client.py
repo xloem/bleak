@@ -22,7 +22,6 @@ from jnius import autoclass, cast, PythonJavaClass, java_method
 
 logger = logging.getLogger(__name__)
 
-print('client.py')
 class _java:
     BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
     BluetoothDevice = autoclass('android.bluetooth.BluetoothDevice')
@@ -34,15 +33,19 @@ class _java:
     context = cast('android.content.Context', activity.getApplicationContext())
     PythonBluetoothGattCallback = autoclass('com.github.hbldh.bleak.PythonBluetoothGattCallback')
 
+    STATE_OFF = BluetoothAdapter.STATE_OFF
+    STATE_TURNING_ON = BluetoothAdapter.STATE_TURNING_ON
+    STATE_ON = BluetoothAdapter.STATE_ON
+    STATE_TURNING_OFF = BluetoothAdapter.STATE_TURNING_OFF
     ACTION_BOND_STATE_CHANGED = BluetoothDevice.ACTION_BOND_STATE_CHANGED
     EXTRA_BOND_STATE = BluetoothDevice.EXTRA_BOND_STATE
     BOND_BONDED = BluetoothDevice.BOND_BONDED
     BOND_BONDING = BluetoothDevice.BOND_BONDING
     BOND_NONE = BluetoothDevice.BOND_NONE
+    GATT_SUCCESS = BluetoothGatt.GATT_SUCCESS
     WRITE_TYPE_NO_RESPONSE = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
     WRITE_TYPE_DEFAULT = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
     WRITE_TYPE_SIGNED = BluetoothGattCharacteristic.WRITE_TYPE_SIGNED
-print('java consts loaded')
 
 class BleakClientP4Android(BaseBleakClient):
     """A python-for-android Bleak Client
@@ -59,7 +62,7 @@ class BleakClientP4Android(BaseBleakClient):
     """
 
     def __init__(self, address_or_ble_device: Union[BLEDevice, str], **kwargs):
-        super(BleakClientBlueZDBus, self).__init__(address_or_ble_device, **kwargs)
+        super(BleakClientP4Android, self).__init__(address_or_ble_device, **kwargs)
         # kwarg "device" is for backwards compatibility
         self._adapter = kwargs.get("adapter", kwargs.get("device", None))
         self._gatt = None
@@ -89,7 +92,7 @@ class BleakClientP4Android(BaseBleakClient):
 
         connstate = self._callback.prepare('onConnectionStateChange')
         self._gatt = self._device.connectGatt(_java.context, False, self._callback.java)
-        await self_callback.expect(connstate, 'STATE_CONNECTED')
+        await self._callback.expect(connstate, 'STATE_CONNECTED')
 
         logger.debug("Connection succesful.")
 
@@ -453,7 +456,7 @@ class BleakClientP4Android(BaseBleakClient):
                 UUID or directly by the BleakGATTCharacteristicP4Android object representing it.
             callback (function): The function to be called on notification.
         """
-        if not isinstance(char_specifier, BleakGATTCharacteristicBlueZDBus):
+        if not isinstance(char_specifier, BleakGATTCharacteristicP4Android):
             characteristic = self.services.get_characteristic(char_specifier)
         else:
             characteristic = char_specifier
@@ -504,12 +507,10 @@ class BleakClientP4Android(BaseBleakClient):
     def _dispatch_notification(self, handle, data):
         self._subscriptions[handle](handle, data)
 
-print('main class defined')
 class _PythonBluetoothGattCallback(PythonJavaClass):
     __javainterfaces__ = ['com.github.hbldh.bleak.PythonBluetoothGattCallback$Interface']
     __javacontext__ = 'app'
 
-    print('status codes')
     _status_codes = {
         getattr(_java.BluetoothGatt, name): name
         for name in (
@@ -525,10 +526,6 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
             'GATT_FAILURE',
         )}
 
-    print('success field')
-    GATT_SUCCESS = _java.BluetoothGatt.GATT_SUCCESS
-
-    print('connection states')
     _connection_states = {
         getattr(_java.BluetoothProfile, name): name
         for name in (
@@ -538,10 +535,9 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
             'STATE_DISCONNECTING'
         )}
 
-    def __init__(self, client, loop, device):
+    def __init__(self, client, loop):
         self._client = client
         self._loop = loop
-        self._device = device
         self.java = _java.PythonBluetoothGattCallback(self)
         self.states = {}
 
@@ -586,23 +582,29 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
         if match:
             return match
         else:
-            raise BleakException('Expected', expected, 'got', result)
+            raise BleakError('Expected', expected, 'got', result)
 
     def _result_state_unthreadsafe(self, status, source, data):
-        future = self.states[source]
-        if status == _PythonBluetoothGattCallback.GATT_SUCCESS:
+        status_str = _PythonBluetoothGattCallback._status_codes[status]
+        logger.debug("Java state transfer {0} {1}: {2}".format(source, status_str, data))
+        print('state:', source, status_str, *data)
+        future = self.states.get(source, None)
+        if future is None:
+            if source == 'onConnectionStateChange' and data[0] == 'STATE_DISCONNECTED':
+                self._client._disconnected_callback(self._client)
+            return
+        if status == _java.GATT_SUCCESS:
             future.set_result(data)
         else:
-            status = _PythonBluetoothGattCallback._status_codes[status]
-            future.set_exception(BleakException(source, status, *data))
+            future.set_exception(BleakError(source, status_str, *data))
         
     def _result_state_threadsafe(self, status, source, *data):
-        self._loop.call_soon_threadsafe(self._result_unthreadsafe, status, source, data)
+        self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, status, source, data)
 
     @java_method('(II)V')
-    def onConnectionStateChange(self, status, state):
+    def onConnectionStateChange(self, status, new_state):
         state = _PythonBluetoothGattCallback._connection_states[new_state]
-        self._result_state_threadsafe(status, 'onConnectionStateChange', state, state)
+        self._result_state_threadsafe(status, 'onConnectionStateChange', state)
 
     @java_method('(I)V')
     def onServicesDiscovered(self, status):
@@ -616,7 +618,7 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
     def onCharacteristicRead(self, handle, status, value):
         self._result_state_threadsafe(status, ('onCharacteristicRead', handle), value)
 
-    @java_method('(LII)V')
+    @java_method('(II)V')
     def onCharacteristicWrite(self, handle, status):
         self._result_state_threadsafe(status, ('onCharacteristicWrite', handle))
     
