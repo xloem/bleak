@@ -61,14 +61,12 @@ class BleakScannerP4Android(BaseBleakScanner):
                 'android.permission.ACCESS_BACKGROUND_LOCATION'],
             handle_permissions)
         await permission_acknowledged
-        print('permission acknowledged')
 
         self._adapter = _java.BluetoothAdapter.getDefaultAdapter()
         if self._adapter is None:
             raise BleakError('Bluetooth is not supported on this hardware platform')
         if self._adapter.getState() != _java.STATE_ON:
             raise BleakError('Bluetooth is not turned on')
-        print('adapter acquired')
 
         callback = _PythonScanCallback(self, loop)
         self._android_callback = _java.PythonScanCallback(callback)

@@ -11,13 +11,8 @@ class BleakGATTServiceP4Android(BleakGATTService):
         super().__init__(java)
         self.__uuid = self.obj.getUuid().toString()
         self.__handle = self.obj.getInstanceId()
-
-        characteristics = self.obj.getCharacteristics()
-        numCharacteristics = len(characteristics)
-        self.__characteristics = [
-            BleakGATTCharacteristicP4Android(characteristics[index], self.uuid)
-            for index in range(numCharacteristics)]
-
+        self.__characteristics = []
+ 
     @property
     def uuid(self) -> str:
         """The UUID to this service"""
@@ -27,3 +22,10 @@ class BleakGATTServiceP4Android(BleakGATTService):
     def characteristics(self) -> List[BleakGATTCharacteristicP4Android]:
         """List of characteristics for this service"""
         return self.__characteristics
+
+    def add_characteristic(self, characteristic: BleakGATTCharacteristicP4Android):
+        """Add a :py:class:`~BleakGATTCharacteristicBlueZDBus` to the service.
+
+        Should not be used by end user, but rather by `bleak` itself.
+        """
+        self.__characteristics.append(characteristic)

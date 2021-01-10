@@ -8,17 +8,16 @@ from jnius import autoclass
 
 class _java:
     BluetoothGattCharacteristic = autoclass('android.bluetooth.BluetoothGattCharacteristic')
-
-_GattCharacteristicsFlagsEnum = {
-    _java.BluetoothGattCharacteristic.PROPERTY_BROADCAST: 'broadcast',
-    _java.BluetoothGattCharacteristic.PROPERTY_EXTENDED_PROPS: 'extended-properties',
-    _java.BluetoothGattCharacteristic.PROPERTY_INDICATE: 'indicate',
-    _java.BluetoothGattCharacteristic.PROPERTY_NOTIFY: 'notify',
-    _java.BluetoothGattCharacteristic.PROPERTY_READ: 'read',
-    _java.BluetoothGattCharacteristic.PROPERTY_SIGNED_WRITE: 'authenticated-signed-writes',
-    _java.BluetoothGattCharacteristic.PROPERTY_WRITE: 'write',
-    _java.BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE: 'write-without-response',
-}
+    CHARACTERISTIC_PROPERTY_DBUS_NAMES = {
+        BluetoothGattCharacteristic.PROPERTY_BROADCAST: 'broadcast',
+        BluetoothGattCharacteristic.PROPERTY_EXTENDED_PROPS: 'extended-properties',
+        BluetoothGattCharacteristic.PROPERTY_INDICATE: 'indicate',
+        BluetoothGattCharacteristic.PROPERTY_NOTIFY: 'notify',
+        BluetoothGattCharacteristic.PROPERTY_READ: 'read',
+        BluetoothGattCharacteristic.PROPERTY_SIGNED_WRITE: 'authenticated-signed-writes',
+        BluetoothGattCharacteristic.PROPERTY_WRITE: 'write',
+        BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE: 'write-without-response',
+    }
 
 class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     """GATT Characteristic implementation for the python-for-android backend"""
@@ -28,19 +27,14 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
         self.__uuid = self.obj.getUuid().toString()
         self.__handle = self.obj.getInstanceId()
         self.__service_uuid = service_uuid
+        self.__descriptors = []
 
         self.__properties = [
             name
             for flag, name
-            in _GattCharacteristicsFlagsEnum.items()
+            in _java.CHARACTERISTIC_PROPERTY_DBUS_NAMES.items()
             if flag & self.obj.getProperties()
         ]
-
-        descriptors = self.obj.getDescriptors()
-        numDescriptors = len(descriptors)
-        self.__descriptors = [
-            BleakGATTDescriptorP4Android(descriptors[index], self.__uuid)
-            for index in range(numDescriptors)]
         
     @property
     def service_uuid(self) -> str:
@@ -81,3 +75,10 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
         if len(matches) == 0:
             return None
         return matches[0]
+
+    def add_descriptor(self, descriptor: BleakGATTDescriptor):
+        """Add a :py:class:`~BleakGATTDescriptor` to the characteristic.
+
+        Should not be used by end user, but rather by `bleak` itself.
+        """
+        self.__descriptors.append(descriptor)
