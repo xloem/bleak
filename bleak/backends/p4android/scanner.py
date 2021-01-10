@@ -123,10 +123,13 @@ class _PythonScanCallback(PythonJavaClass):
         self._loop = loop
         self.status = self._loop.create_future()
 
+    def __del__(self):
+        print('DESTROYING SCANNER CALLBACK!  HAS SCANNING STOPPED?')
+
     @java_method('(I)V')
     def onScanFailed(self, errorCode):
         print('scan failed')
-        self._loop.call_soon_threadsafe(self.status.set_exception, BleakError(self._errors[errorCode]()))
+        self._loop.call_soon_threadsafe(self.status.set_exception, BleakError(self._errors[errorCode]))
     
     @java_method('(Landroid/bluetooth/le/ScanResult;)V')
     def onScanResult(self, result):

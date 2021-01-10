@@ -352,14 +352,14 @@ class BleakClientP4Android(BaseBleakClient):
         # so, if we want parallel reads, we'll want to multiplex these callbacks
         # just like the notification callbacks.
         # the easy way is to bundle handle up with the identifier
-        valuestate = self.callback.prepare(('onCharacteristicRead', characteristic.handle))
+        valuestate = self.__callbacks.prepare(('onCharacteristicRead', characteristic.handle))
         if not self.__gatt.readCharacteristic(characteristic.obj):
             raise BleakError(
                 "Failed to initiate read from characteristic {0}".format(
                     characteristic.uuid
                 )
             )
-        value, = await self.callback.expect(valuestate)
+        value, = await self.__callbacks.expect(valuestate)
         value = bytearray(value)
         logger.debug(
             "Read Characteristic {0} | {1}: {2}".format(
@@ -396,14 +396,14 @@ class BleakClientP4Android(BaseBleakClient):
                 )
             )
 
-        valuestate = self.callback.prepare(('onDescriptorRead', descriptor.uuid))
+        valuestate = self.__callbacks.prepare(('onDescriptorRead', descriptor.uuid))
         if not self.__gatt.readDescriptor(descriptor.obj):
             raise BleakError(
                 "Failed to initiate read from descriptor {0}".format(
                     descriptor.uuid
                 )
             )
-        value, = await self.callback.expect(valuestate)
+        value, = await self.__callbacks.expect(valuestate)
         value = bytearray(value)
 
         logger.debug(
@@ -428,10 +428,13 @@ class BleakClientP4Android(BaseBleakClient):
             response (bool): If write-with-response operation should be done. Defaults to `False`.
 
         """
+        print('p4android, write gatt char')
+        print(char_specifier)
         if not isinstance(char_specifier, BleakGATTCharacteristicP4Android):
             characteristic = self.services.get_characteristic(char_specifier)
         else:
             characteristic = char_specifier
+        print(characteristic)
 
         if not characteristic:
             raise BleakError("Characteristic {0} was not found!".format(char_specifier))
@@ -458,21 +461,24 @@ class BleakClientP4Android(BaseBleakClient):
                 % str(characteristic.uuid)
             )
 
+        print('setting write type')
         if response:
             characteristic.obj.setWriteType(_java.WRITE_TYPE_DEFAULT)
         else:
             characteristic.obj.setWriteType(_java.WRITE_TYPE_NO_RESPONSE)
 
+        print('setting value')
         characteristic.obj.setValue(data)
 
-        writestate = self.callback.prepare(('onCharacteristicWrite', characteristic.handle))
+        print('preparing callback')
+        writestate = self.__callbacks.prepare(('onCharacteristicWrite', characteristic.handle))
         if not self.__gatt.writeCharacteristic(characteristic.obj):
             raise BleakError(
                 "Failed to initiate write to characteristic {0}".format(
                     characteristic.uuid
                 )
             )
-        await self.callback.expect(writestate)
+        await self.__callbacks.expect(writestate)
 
         logger.debug(
             "Write Characteristic {0} | {1}: {2}".format(
@@ -503,14 +509,14 @@ class BleakClientP4Android(BaseBleakClient):
             raise BleakError("Descriptor {0} was not found!".format(desc_specifier))
 
         descriptor.obj.setValue(data)
-        writestate = self.callback.prepare(('onDescriptorWrite', descriptor.uuid))
+        writestate = self.__callbacks.prepare(('onDescriptorWrite', descriptor.uuid))
         if not self.__gatt.writeDescriptor(descriptor.obj):
             raise BleakError(
                 "Failed to initiate write to descriptor {0}".format(
                     descriptor.uuid
                 )
             )
-        await self.callback.expect(writestate)
+        await self.__callbacks.expect(writestate)
 
         logger.debug(
             "Write Descriptor {0} | {1}: {2}".format(handle, self.address, data)
@@ -601,12 +607,15 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
         self.futures = {}
         self.states = {}
 
+    def __del__(self):
+        print('DESTROYING CLIENT CALLBACKS!  WILL NO MORE BE CALLED?')
+
     def _if_expected(self, result, expected):
         if result[:len(expected)] == expected[:]:
-            print('match',expected)
+            print('match {0}'.format(expected))
             return result[len(expected):]
         else:
-            print('match failure',result[:len(expected)],expected[:])
+            print('match failure expected {0} got {1}'.format(expected, result))
             return None
 
     def prepare(self, source):
@@ -623,23 +632,15 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
             match = self._if_expected(future.result(), expected)
             if match is not None:
                 logger.debug("Not waiting for java {0} because found {1}".format(source, *expected))
+                print("logdebug not working yet: Not waiting for java {0} because found {1}".format(source, *expected))
                 return match
             else:
                 return self.prepare(source)
         logger.debug("Reusing existing wait for java {0}".format(source))
+        print("logdebug not working yet: Reusing existing wait for java {0}".format(source))
         return future
 
     async def expect(self, future, *expected):
-        #outdated = future.done()
-        #if outdated:
-        #    result = future.result():
-        #else:
-        #    result = await future
-        #match = self._if_expected(result, expected)
-        #if outdated and not match:
-        #    del self.futures[source]
-        #    result = await self.get_unthreadsafe(source)
-        #    match = self._if_expected(result, expected)
         result = await future
         match = self._if_expected(result, expected)
         if match is not None:
@@ -661,14 +662,27 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
         print('state:', source, status_str, *data)
         self.states[source] = (status_str, *data)
         future = self.futures.get(source, None)
-        if future is None:
+        if future is not None and not future.done():
+            if status == _java.GATT_SUCCESS:
+                future.set_result(data)
+            else:
+                future.set_exception(BleakError(source, status_str, *data))
+        else:
             if source == 'onConnectionStateChange' and data[0] == 'STATE_DISCONNECTED':
                 self._client._disconnected_callback(self._client)
-            return
-        if status == _java.GATT_SUCCESS:
-            future.set_result(data)
-        else:
-            future.set_exception(BleakError(source, status_str, *data))
+            if status != _java.GATT_SUCCESS:
+                # an error happened with nothing waiting for it
+                exception = BleakError(source, status_str, *data)
+                namedfutures = [namedfuture for namedfuture in self.futures.items() if not future.done()]
+                if len(namedfutures):
+                    # send it on existing requests
+                    for name, future in namedfutures:
+                        warnings.warn('Redirecting error without home to {0}'.format(name))
+                        future.set_exception(exception)
+                else:
+                    # send it on the event thread
+                    raise exception
+                    
         
     def _result_state_threadsafe(self, status, source, *data):
         self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, status, source, data)
