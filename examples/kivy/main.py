@@ -2,13 +2,16 @@
 
 from kivy.app import App
 #from kivy.core.window import Window
-from kivy.logger import Logger
 from kivy.uix.label import Label
 from kivy.uix.scrollview import ScrollView
 
+# bind bleak's python logger into kivy's logger before importing python module using logging
+from kivy.logger import Logger
+import logging
+logging.Logger.manager.root = Logger
+
 import asyncio
 import bleak
-import logging
 
 class ExampleApp(App):
     def __init__(self):
@@ -37,7 +40,6 @@ class ExampleApp(App):
         self.running = False
 
     async def example(self):
-        print('example')
         scanner = bleak.BleakScanner()
         while self.running:
             try:
@@ -56,7 +58,6 @@ class ExampleApp(App):
                     client = bleak.BleakClient(device.address)
                     try:
                         await client.connect()
-
                         services = await client.get_services()
                         for service in services.services.values():
                             self.line('  service {0}'.format(service.uuid))
@@ -69,50 +70,41 @@ class ExampleApp(App):
                             serial='273e0001-4c4d-454d-96be-f03bac821358'
                             channel='273e0003-4c4d-454d-96be-f03bac821358'
                             # subscribe to both
+                            queue = asyncio.Queue()
+                            line = ''
                             def serial_data(handle, data):
-                                self.line(data.decode('utf-8'))
+                                nonlocal line
+                                line += data[1:1+data[0]].decode('utf-8')
+                                if line[-1] == '}':
+                                    self.line(line)
+                                    line = ''
+                                    queue.put_nowait(line)
                             self.line('starting notify 1')
                             await client.start_notify(serial, serial_data)
                             future = asyncio.get_event_loop().create_future()
-                            def channel_data(handle, data):
-                                self.line(data)
-                                future.set_result(True)
-                            self.line('starting notify 2')
-                            await client.start_notify(channel, channel_data)
                             self.line('writing data ' + str(client))
-                            for char in '\x03v1\n':
-                                data = bytearray([ord(char)])
-                                self.line('writing ' + str(data))
-                                await client.write_gatt_char(serial, data)
-                            for char in '\x02s\n':
-                                data = bytearray([ord(char)])
-                                self.line('writing ' + str(data))
-                                await client.write_gatt_char(serial, data)
-                            for char in '\x04p63\n':
-                                data = bytearray([ord(char)])
-                                self.line('writing ' + str(data))
-                                await client.write_gatt_char(serial, data)
-                            for char in '\x02d\n':
-                                data = bytearray([ord(char)])
-                                self.line('writing ' + str(data))
-                                await client.write_gatt_char(serial, data)
+                            await client.write_gatt_char(serial, bytearray('\x03v1\n', 'utf-8'), False)
+                            await queue.get()
+                            await client.write_gatt_char(serial, bytearray('\x02s\n', 'utf-8'), False)
+                            await queue.get()
+                            await client.write_gatt_char(serial, bytearray('\x04p63\n', 'utf-8'), False)
+                            await queue.get()
+                            await client.write_gatt_char(serial, bytearray('\x02d\n', 'utf-8'), False)
+                            await queue.get()
                             self.line('done')
-                            await future
 
                         await client.disconnect()
                     except bleak.exc.BleakError as e:
                         self.line('  error {0}'.format(e))
             except bleak.exc.BleakError as e:
                 self.line('ERROR {0}'.format(e))
-                asyncio.sleep(1)
+                await asyncio.sleep(1)
         self.line('example loop terminated', True)
 
 
 if __name__ == '__main__':
     print('main')
-    # bind bleak's python logger into kivy's logger?
-    logging.Logger.manager.root = Logger
-    logging.basicConfig(level=logging.DEBUG)
+    Logger.setLevel(logging.DEBUG)
 
     # app running on one thread with two async coroutines
     app = ExampleApp()

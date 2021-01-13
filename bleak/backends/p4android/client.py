@@ -59,6 +59,9 @@ class _java:
         # https://android.googlesource.com/platform/external/bluetooth/bluedroid/+/5738f83aeb59361a0a2eda2460113f6dc9194271/stack/include/gatt_api.h
         # https://android.googlesource.com/platform/system/bt/+/master/stack/include/gatt_api.h
         # https://www.bluetooth.com/specifications/bluetooth-core-specification/
+        # if error codes are missing you could check the bluetooth
+        # specification (last link above) as not all were copied over, since
+        # android repurposed so many
         0x0000: 'GATT_SUCCESS',
         0x0001: 'GATT_INVALID_HANDLE',
         0x0002: 'GATT_READ_NOT_PERMIT',
@@ -79,11 +82,11 @@ class _java:
         0x0011: 'GATT_INSUF_RESOURCE',
         0x0012: 'GATT_DATABASE_OUT_OF_SYNC',
         0x0013: 'GATT_VALUE_NOT_ALLOWED',
-        0x0014: 'Remote Device Terminated Connection due to Low Resources',
-        0x0015: 'Remote Device Terminated Connection due to Power Off',
-        0x0016: 'Connection Terminated By Local Host',
-        0x0017: 'Repeated Attempts',
-        0x0018: 'Pairing Not Allowed',
+        0x0014: 'BLU_REM_TERM_CONN_LOW_RES', # names made up from bluetooth spec
+        0x0015: 'BLU_REM_TERM_CONN_POW_OFF',
+        0x0016: 'BLU_LOC_TERM_CONN',
+        0x0017: 'BLU_REPEATED_ATTEMPTS',
+        0x0018: 'BLU_PAIRING_NOT_ALLOWED',
         0x007f: 'GATT_TOO_SHORT',
         0x0080: 'GATT_NO_RESOURCES',
         0x0081: 'GATT_INTERNAL_ERROR',
@@ -125,11 +128,10 @@ class BleakClientP4Android(BaseBleakClient):
         address_or_ble_device (`BLEDevice` or str): The Bluetooth address of the BLE peripheral to connect to or the `BLEDevice` object representing it.
 
     Keyword Args:
-        timeout (float): Timeout for required ``BleakScanner.find_device_by_address`` call. Defaults to 10.0.
         disconnected_callback (callable): Callback that will be scheduled in the
             event loop when the client is disconnected. The callable must take one
             argument, which will be this client object.
-        adapter (str): Bluetooth adapter to use for discovery.
+        adapter (str): Bluetooth adapter to use for discovery. [unused]
     """
 
     def __init__(self, address_or_ble_device: Union[BLEDevice, str], **kwargs):
@@ -141,6 +143,7 @@ class BleakClientP4Android(BaseBleakClient):
     def __del__(self):
         if self.__gatt is not None:
             self.__gatt.close()
+            self.__gatt = None
 
     # Connectivity methods
 
@@ -165,19 +168,23 @@ class BleakClientP4Android(BaseBleakClient):
 
         logger.debug("Connecting to BLE device @ {0}".format(self.address))
 
-        connstate = self.__callbacks.prepare('onConnectionStateChange')
-        self.__gatt = self.__device.connectGatt(_java.context, False, self.__callbacks.java)
-        await self.__callbacks.expect(connstate, 'STATE_CONNECTED')
+        self.__gatt, = await self.__callbacks.perform_and_wait(
+            dispatchApi = self.__device.connectGatt,
+            dispatchParams = (_java.context, False, self.__callbacks.java),
+            resultApi = 'onConnectionStateChange',
+            resultExpected = ('STATE_CONNECTED',),
+            return_indicates_status = False
+        )
 
-        logger.debug("Connection succesful.")
+        logger.debug("Connection successful.")
 
         self._subscriptions = {}
 
-        discoverstate = self.__callbacks.prepare('onServicesDiscovered')
-        if not self.__gatt.discoverServices():
-            raise BleakError('failed to initiate service discovery')
-
-        await self.__callbacks.expect(discoverstate)
+        await self.__callbacks.perform_and_wait(
+            dispatchApi = self.__gatt.discoverServices,
+            dispatchParams = (),
+            resultApi = 'onServicesDiscovered'
+        )
 
         await self.get_services()
         return True
@@ -198,12 +205,15 @@ class BleakClientP4Android(BaseBleakClient):
 
         # Try to disconnect the actual device/peripheral
         try:
-            if self.__callbacks.prepare_unless('onConnectionStateChange', 'STATE_DISCONNECTED'):
-                self.__gatt.disconnect()
-                await self.__callbacks.expect(connstate, 'STATE_DISCONNECTED')
+            await self.__callbacks.perform_and_wait(
+                dispatchApi = self.__gatt.disconnect,
+                dispatchParams = (),
+                resultApi = 'onConnectionStateChange',
+                resultExpected = ('STATE_DISCONNECTED',),
+                unless_already = True,
+                return_indicates_status = False
+            )
             self.__gatt.close()
-            self.__gatt = None
-            self.__callbacks = None
         except Exception as e:
             logger.error("Attempt to disconnect device failed: {0}".format(e))
 
@@ -211,6 +221,7 @@ class BleakClientP4Android(BaseBleakClient):
 
         if is_disconnected:
             self.__gatt = None
+            self.__callbacks = None
 
             # Reset all stored services.
             self.services = BleakGATTServiceCollection()
@@ -283,8 +294,10 @@ class BleakClientP4Android(BaseBleakClient):
             Boolean representing connection status.
 
         """
-        state = self.__callbacks.states['onConnectionStateChange'][1]
-        return state == 'STATE_DISCONNECTED'
+        return (
+            self.__callbacks is not None and
+            self.__callbacks.states['onConnectionStateChange'][1] == 'STATE_DISCONNECTED'
+        )
 
     # GATT services methods
 
@@ -359,17 +372,11 @@ class BleakClientP4Android(BaseBleakClient):
                 )
             )
 
-        # so, if we want parallel reads, we'll want to multiplex these callbacks
-        # just like the notification callbacks.
-        # the easy way is to bundle handle up with the identifier
-        valuestate = self.__callbacks.prepare(('onCharacteristicRead', characteristic.handle))
-        if not self.__gatt.readCharacteristic(characteristic.obj):
-            raise BleakError(
-                "Failed to initiate read from characteristic {0}".format(
-                    characteristic.uuid
-                )
-            )
-        value, = await self.__callbacks.expect(valuestate)
+        value, = await self.__callbacks.perform_and_wait(
+            dispatchApi = self.__gatt.readCharacteristic,
+            dispatchParams = (characteristic.obj,),
+            resultApi = ('onCharacteristicRead', characteristic.handle)
+        )
         value = bytearray(value)
         logger.debug(
             "Read Characteristic {0} | {1}: {2}".format(
@@ -406,14 +413,11 @@ class BleakClientP4Android(BaseBleakClient):
                 )
             )
 
-        valuestate = self.__callbacks.prepare(('onDescriptorRead', descriptor.uuid))
-        if not self.__gatt.readDescriptor(descriptor.obj):
-            raise BleakError(
-                "Failed to initiate read from descriptor {0}".format(
-                    descriptor.uuid
-                )
-            )
-        value, = await self.__callbacks.expect(valuestate)
+        value, = await self.__callbacks.perform_and_wait(
+            dispatchApi = self.__gatt.readDescriptor,
+            dispatchParams = (descriptor.obj,),
+            resultApi = ('onDescriptorRead', descriptor.uuid)
+        )
         value = bytearray(value)
 
         logger.debug(
@@ -440,13 +444,10 @@ class BleakClientP4Android(BaseBleakClient):
             response (bool): If write-with-response operation should be done. Defaults to `False`.
 
         """
-        print('p4android, write gatt char')
-        print(char_specifier)
         if not isinstance(char_specifier, BleakGATTCharacteristicP4Android):
             characteristic = self.services.get_characteristic(char_specifier)
         else:
             characteristic = char_specifier
-        print(characteristic)
 
         if not characteristic:
             raise BleakError("Characteristic {0} was not found!".format(char_specifier))
@@ -473,24 +474,18 @@ class BleakClientP4Android(BaseBleakClient):
                 % str(characteristic.uuid)
             )
 
-        print('setting write type')
         if response:
             characteristic.obj.setWriteType(_java.WRITE_TYPE_DEFAULT)
         else:
             characteristic.obj.setWriteType(_java.WRITE_TYPE_NO_RESPONSE)
 
-        print('setting value')
         characteristic.obj.setValue(data)
 
-        print('preparing callback')
-        writestate = self.__callbacks.prepare(('onCharacteristicWrite', characteristic.handle))
-        if not self.__gatt.writeCharacteristic(characteristic.obj):
-            raise BleakError(
-                "Failed to initiate write to characteristic {0}".format(
-                    characteristic.uuid
-                )
-            )
-        await self.__callbacks.expect(writestate)
+        await self.__callbacks.perform_and_wait(
+            dispatchApi = self.__gatt.writeCharacteristic,
+            dispatchParams = (characteristic.obj,),
+            resultApi = ('onCharacteristicWrite', characteristic.handle)
+        )
 
         logger.debug(
             "Write Characteristic {0} | {1}: {2}".format(
@@ -520,17 +515,13 @@ class BleakClientP4Android(BaseBleakClient):
         if not descriptor:
             raise BleakError("Descriptor {0} was not found!".format(desc_specifier))
 
-        print('preparing to write', data)
         descriptor.obj.setValue(data)
-        print('writing', descriptor.obj.getValue().tolist())
-        writestate = self.__callbacks.prepare(('onDescriptorWrite', descriptor.uuid))
-        if not self.__gatt.writeDescriptor(descriptor.obj):
-            raise BleakError(
-                "Failed to initiate write to descriptor {0}".format(
-                    descriptor.uuid
-                )
-            )
-        await self.__callbacks.expect(writestate)
+
+        await self.__callbacks.perform_and_wait(
+            dispatchApi = self.__gatt.writeDescriptor,
+            dispatchParams = (descriptor.obj,),
+            resultApi = ('onDescriptorWrite', descriptor.uuid)
+        )
 
         logger.debug(
             "Write Descriptor {0} | {1}: {2}".format(descriptor.uuid, descriptor.handle, data)
@@ -564,8 +555,6 @@ class BleakClientP4Android(BaseBleakClient):
         else:
             characteristic = char_specifier
 
-        print('start_notify', characteristic, callback)
-
         if not characteristic:
             raise BleakError(
                 "Characteristic with UUID {0} could not be found!".format(
@@ -583,8 +572,6 @@ class BleakClientP4Android(BaseBleakClient):
             )
         
         await self.write_gatt_descriptor(characteristic.notification_descriptor, _java.ENABLE_NOTIFICATION_VALUE)
-
-        print('enabled notification')
 
     async def stop_notify(
         self,
@@ -615,9 +602,6 @@ class BleakClientP4Android(BaseBleakClient):
             )
         del self._subscriptions[characteristic.handle]
 
-    def _dispatch_notification(self, handle, data):
-        self._subscriptions[handle](handle, bytearray(data.tolist()))
-
 class _PythonBluetoothGattCallback(PythonJavaClass):
     __javainterfaces__ = ['com.github.hbldh.bleak.PythonBluetoothGattCallback$Interface']
     __javacontext__ = 'app'
@@ -630,37 +614,57 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
         self.states = {}
 
     def __del__(self):
+        # sometimes there's a segfault; it may have been resolved.
+        # if not, this message was to help figure out what had been deallocated when it happened
         print('DESTROYING CLIENT CALLBACKS!  WILL NO MORE BE CALLED?')
 
     def _if_expected(self, result, expected):
         if result[:len(expected)] == expected[:]:
-            print('match {0}'.format(expected))
             return result[len(expected):]
         else:
-            print('match failure expected {0} got {1}'.format(expected, result))
             return None
 
-    def prepare(self, source):
-        logger.debug("Waiting for java {0}".format(source))
-        future = self._loop.create_future()
-        self.futures[source] = future
-        return future
+    async def perform_and_wait(self, dispatchApi, dispatchParams, resultApi, resultExpected = (), unless_already = False, return_indicates_status = True):
+        result2 = None
+        if unless_already and resultApi in self.futures:
+            state = self.futures[resultApi]
+            if state.done():
+                result2 = self._if_expected(state.result(), resultExpected)
+                result1 = bool(result2)
 
-    def prepare_unless(self, source, *expected):
-        if source not in self.futures:
-            return self.prepare(source)
-        future = self.futures[source]
-        if future.done():
-            match = self._if_expected(future.result(), expected)
-            if match is not None:
-                logger.debug("Not waiting for java {0} because found {1}".format(source, *expected))
-                print("logdebug not working yet: Not waiting for java {0} because found {1}".format(source, *expected))
-                return match
-            else:
-                return self.prepare(source)
-        logger.debug("Reusing existing wait for java {0}".format(source))
-        print("logdebug not working yet: Reusing existing wait for java {0}".format(source))
-        return future
+        if result2 is not None:
+            logger.debug("Not waiting for android api {0} because found {1}".format(resultApi, resultExpected))
+        else:
+            logger.debug("Waiting for android api {0}".format(resultApi))
+
+            state = self._loop.create_future()
+            self.futures[resultApi] = state
+            result1 = dispatchApi(*dispatchParams)
+            if return_indicates_status and not result1:
+                del self.futures[resultApi]
+                raise BleakError('{} failed, not waiting for {}'.format(dispatchApi.__name__, resultApi))
+            result2 = await self.expect(state, *resultExpected)
+
+            logger.debug("{0} succeeded {1}".format(resultApi, result2))
+
+        if return_indicates_status:
+            return result2
+        else:
+            return (result1, *result2)
+
+    #def prepare_unless(self, source, *expected):
+    #    if source not in self.futures:
+    #        return self.prepare(source)
+    #    future = self.futures[source]
+    #    if future.done():
+    #        match = self._if_expected(future.result(), expected)
+    #        if match is not None:
+    #            logger.debug("Not waiting for java {0} because found {1}".format(source, *expected))
+    #            return match
+    #        else:
+    #            return self.prepare(source)
+    #    logger.debug("Reusing existing wait for java {0}".format(source))
+    #    return future
 
     async def expect(self, future, *expected):
         result = await future
@@ -671,7 +675,6 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
             raise BleakError('Expected', expected, 'got', result)
 
     def _result_state_unthreadsafe(self, status, source, data):
-        print('self=', self, 'self._client=', self._client)
         status_str = _java.GATT_STATUS_NAMES.get(status, status)
             # some ideas found on the internet for managing GATT_ERROR 133 0x85
             # (disputed) change setReportDelay from 0 to 400 (or 500)
@@ -682,7 +685,6 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
             # pass BluetoothDevice.TRANSPORT_LE to connection call
             # other solutions mentioned on https://github.com/android/connectivity-samples/issues/18
         logger.debug("Java state transfer {0} {1}: {2}".format(source, status_str, data))
-        print('state:', source, status_str, *data)
         self.states[source] = (status_str, *data)
         future = self.futures.get(source, None)
         if future is not None and not future.done():
@@ -692,8 +694,9 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
                 future.set_exception(BleakError(source, status_str, *data))
         else:
             if source == 'onConnectionStateChange' and data[0] == 'STATE_DISCONNECTED':
-                self._client._disconnected_callback(self._client)
-            if status != _java.GATT_SUCCESS:
+                if self._client._disconnected_callback is not None:
+                    self._client._disconnected_callback(self._client)
+            elif status != _java.GATT_SUCCESS:
                 # an error happened with nothing waiting for it
                 exception = BleakError(source, status_str, *data)
                 namedfutures = [namedfuture for namedfuture in self.futures.items() if not future.done()]
@@ -721,9 +724,11 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
 
     @java_method('(I[B)V')
     def onCharacteristicChanged(self, handle, value):
-        print('onCharacteristicChanged')
-        print(handle, value)
-        self._loop.call_soon_threadsafe(self._client._dispatch_notification, handle, value)
+        self._loop.call_soon_threadsafe(
+            self._client._subscriptions[handle],
+            handle,
+            bytearray(value.tolist())
+        )
 
     @java_method('(II[B)V')
     def onCharacteristicRead(self, handle, status, value):

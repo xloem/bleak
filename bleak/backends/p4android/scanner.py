@@ -90,10 +90,10 @@ class BleakScannerP4Android(BaseBleakScanner):
             self._android_callback)
         print('scan started')
 
-        #try:
-        #    await asyncio.wait_for(callback.status, timeout=0.2)
-        #except asyncio.exceptions.TimeoutError:
-        #    pass
+        try:
+            await asyncio.wait_for(callback.status, timeout=0.2)
+        except asyncio.exceptions.TimeoutError:
+            pass
 
     async def stop(self):
         print('stop')
@@ -137,29 +137,26 @@ class _PythonScanCallback(PythonJavaClass):
         if not self.status.done():
             self._loop.call_soon_threadsafe(self.status.set_result, True)
         device = result.getDevice()
-        print('getting record')
         record = result.getScanRecord()
-        print('getting uuids')
         service_uuids = record.getServiceUuids()
-        print('enumerating uuids if there')
         if service_uuids is not None:
             service_uuids = [
                 service_uuids[index].getUuid().toString()
                 for index in range(len(service_uuids))]
-        print('getting manufacturer data')
         manufacturer_data = record.getManufacturerSpecificData()
-        print('enumeraitng manufacturer data')
-        print(manufacturer_data)
         manufacturer_data = {
             manufacturer_data.keyAt(index): manufacturer_data.valueAt(index)
             for index in range(manufacturer_data.size())
         }
-        #uuids = device.getUuids() # features
-        print('constructing advertisement data')
+        service_data_iterator = record.getServiceData().entrySet().iterator()
+        service_data = {}
+        while service_data_iterator.hasNext():
+            entry = service_data_iterator.next()
+            service_data[entry.getKey().toString()] = bytearray(entry.getValue().tolist())
         advertisement = AdvertisementData(
             local_name=record.getDeviceName(),
             manufacturer_data=manufacturer_data,
-            #service_data=record.getServiceData(), # Map<ParcelUuid,byte[]> -> dict
+            service_data=service_data,
             service_uuids=service_uuids,
             platform_data=(result,)
         )
@@ -168,7 +165,7 @@ class _PythonScanCallback(PythonJavaClass):
             device.getName(),
             rssi=result.getRssi(),
             uuids=service_uuids,
-            #manufacturer_data=
+            manufacturer_data=manufacturer_data
         )
         self._scanner._devices[device.address] = device
         if self._scanner._callback:
