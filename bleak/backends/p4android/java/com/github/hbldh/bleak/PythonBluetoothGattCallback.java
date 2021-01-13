@@ -60,7 +60,7 @@ public final class PythonBluetoothGattCallback extends BluetoothGattCallback
     @Override
     public void onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic)
     {
-        callback.onCharacteristicChanged(0,new byte[0]);//characteristic.getInstanceId(), characteristic.getValue());
+        callback.onCharacteristicChanged(characteristic.getInstanceId(), characteristic.getValue());
     }
 
     @Override

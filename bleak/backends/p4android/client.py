@@ -58,6 +58,7 @@ class _java:
         # https://developer.android.com/reference/android/bluetooth/BluetoothGatt
         # https://android.googlesource.com/platform/external/bluetooth/bluedroid/+/5738f83aeb59361a0a2eda2460113f6dc9194271/stack/include/gatt_api.h
         # https://android.googlesource.com/platform/system/bt/+/master/stack/include/gatt_api.h
+        # https://www.bluetooth.com/specifications/bluetooth-core-specification/
         0x0000: 'GATT_SUCCESS',
         0x0001: 'GATT_INVALID_HANDLE',
         0x0002: 'GATT_READ_NOT_PERMIT',
@@ -78,6 +79,11 @@ class _java:
         0x0011: 'GATT_INSUF_RESOURCE',
         0x0012: 'GATT_DATABASE_OUT_OF_SYNC',
         0x0013: 'GATT_VALUE_NOT_ALLOWED',
+        0x0014: 'Remote Device Terminated Connection due to Low Resources',
+        0x0015: 'Remote Device Terminated Connection due to Power Off',
+        0x0016: 'Connection Terminated By Local Host',
+        0x0017: 'Repeated Attempts',
+        0x0018: 'Pairing Not Allowed',
         0x007f: 'GATT_TOO_SHORT',
         0x0080: 'GATT_NO_RESOURCES',
         0x0081: 'GATT_INTERNAL_ERROR',
@@ -610,7 +616,7 @@ class BleakClientP4Android(BaseBleakClient):
         del self._subscriptions[characteristic.handle]
 
     def _dispatch_notification(self, handle, data):
-        self._subscriptions[handle](handle, data)
+        self._subscriptions[handle](handle, bytearray(data.tolist()))
 
 class _PythonBluetoothGattCallback(PythonJavaClass):
     __javainterfaces__ = ['com.github.hbldh.bleak.PythonBluetoothGattCallback$Interface']
@@ -665,9 +671,10 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
             raise BleakError('Expected', expected, 'got', result)
 
     def _result_state_unthreadsafe(self, status, source, data):
+        print('self=', self, 'self._client=', self._client)
         status_str = _java.GATT_STATUS_NAMES.get(status, status)
             # some ideas found on the internet for managing GATT_ERROR 133 0x85
-            # change setReportDelay from 0 to 400 (or 500) (disputed)
+            # (disputed) change setReportDelay from 0 to 400 (or 500)
             # retry after delay up to 2 more times
             # connect while hardware already powered up from scanning, before scanning stops
             # do not do a cancelDiscovery at end of scanning; let finish on own
