@@ -20,108 +20,10 @@ from bleak.backends.p4android.descriptor import BleakGATTDescriptorP4Android
 from android.broadcast import BroadcastReceiver
 from jnius import autoclass, cast, java_method
 
+from . import defs
 from . import utils
 
 logger = logging.getLogger(__name__)
-
-class _java:
-    BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
-    BluetoothDevice = autoclass('android.bluetooth.BluetoothDevice')
-    BluetoothGatt = autoclass('android.bluetooth.BluetoothGatt')
-    BluetoothGattCharacteristic = autoclass('android.bluetooth.BluetoothGattCharacteristic')
-    BluetoothGattDescriptor = autoclass('android.bluetooth.BluetoothGattDescriptor')
-    BluetoothProfile = autoclass('android.bluetooth.BluetoothProfile')
-    PythonActivity = autoclass('org.kivy.android.PythonActivity')
-    activity = cast('android.app.Activity', PythonActivity.mActivity)
-    context = cast('android.content.Context', activity.getApplicationContext())
-    PythonBluetoothGattCallback = autoclass('com.github.hbldh.bleak.PythonBluetoothGattCallback')
-
-    STATE_OFF = BluetoothAdapter.STATE_OFF
-    STATE_TURNING_ON = BluetoothAdapter.STATE_TURNING_ON
-    STATE_ON = BluetoothAdapter.STATE_ON
-    STATE_TURNING_OFF = BluetoothAdapter.STATE_TURNING_OFF
-    TRANSPORT_AUTO = BluetoothDevice.TRANSPORT_AUTO
-    TRANSPORT_BREDR = BluetoothDevice.TRANSPORT_BREDR
-    TRANSPORT_LE = BluetoothDevice.TRANSPORT_LE
-    ACTION_BOND_STATE_CHANGED = BluetoothDevice.ACTION_BOND_STATE_CHANGED
-    EXTRA_BOND_STATE = BluetoothDevice.EXTRA_BOND_STATE
-    BOND_BONDED = BluetoothDevice.BOND_BONDED
-    BOND_BONDING = BluetoothDevice.BOND_BONDING
-    BOND_NONE = BluetoothDevice.BOND_NONE
-    GATT_SUCCESS = BluetoothGatt.GATT_SUCCESS
-    WRITE_TYPE_NO_RESPONSE = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-    WRITE_TYPE_DEFAULT = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-    WRITE_TYPE_SIGNED = BluetoothGattCharacteristic.WRITE_TYPE_SIGNED
-    DISABLE_NOTIFICATION_VALUE = BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
-    ENABLE_NOTIFICATION_VALUE = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-    ENABLE_INDICATION_VALUE = BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
-
-    GATT_STATUS_NAMES = {
-        # https://developer.android.com/reference/android/bluetooth/BluetoothGatt
-        # https://android.googlesource.com/platform/external/bluetooth/bluedroid/+/5738f83aeb59361a0a2eda2460113f6dc9194271/stack/include/gatt_api.h
-        # https://android.googlesource.com/platform/system/bt/+/master/stack/include/gatt_api.h
-        # https://www.bluetooth.com/specifications/bluetooth-core-specification/
-        # if error codes are missing you could check the bluetooth
-        # specification (last link above) as not all were copied over, since
-        # android repurposed so many
-        0x0000: 'GATT_SUCCESS',
-        0x0001: 'GATT_INVALID_HANDLE',
-        0x0002: 'GATT_READ_NOT_PERMIT',
-        0x0003: 'GATT_WRITE_NOT_PERMIT',
-        0x0004: 'GATT_INVALID_PDU',
-        0x0005: 'GATT_INSUF_AUTHENTICATION',
-        0x0006: 'GATT_REQ_NOT_SUPPORTED',
-        0x0007: 'GATT_INVALID_OFFSET',
-        0x0008: 'GATT_INSUF_AUTHORIZATION',
-        0x0009: 'GATT_PREPARE_Q_FULL',
-        0x000a: 'GATT_NOT_FOUND',
-        0x000b: 'GATT_NOT_LONG',
-        0x000c: 'GATT_INSUF_KEY_SIZE',
-        0x000d: 'GATT_INVALID_ATTR_LEN',
-        0x000e: 'GATT_ERR_UNLIKELY',
-        0x000f: 'GATT_INSUF_ENCRYPTION',
-        0x0010: 'GATT_UNSUPPORT_GRP_TYPE',
-        0x0011: 'GATT_INSUF_RESOURCE',
-        0x0012: 'GATT_DATABASE_OUT_OF_SYNC',
-        0x0013: 'GATT_VALUE_NOT_ALLOWED',
-        0x0014: 'BLU_REM_TERM_CONN_LOW_RES', # names made up from bluetooth spec
-        0x0015: 'BLU_REM_TERM_CONN_POW_OFF',
-        0x0016: 'BLU_LOC_TERM_CONN',
-        0x0017: 'BLU_REPEATED_ATTEMPTS',
-        0x0018: 'BLU_PAIRING_NOT_ALLOWED',
-        0x007f: 'GATT_TOO_SHORT',
-        0x0080: 'GATT_NO_RESOURCES',
-        0x0081: 'GATT_INTERNAL_ERROR',
-        0x0082: 'GATT_WRONG_STATE',
-        0x0083: 'GATT_DB_FULL',
-        0x0084: 'GATT_BUSY',
-        0x0085: 'GATT_ERROR',
-        0x0086: 'GATT_CMD_STARTED',
-        0x0087: 'GATT_ILLEGAL_PARAMETER',
-        0x0088: 'GATT_PENDING',
-        0x0089: 'GATT_AUTH_FAIL',
-        0x008a: 'GATT_MORE',
-        0x008b: 'GATT_INVALID_CFG',
-        0x008c: 'GATT_SERVICE_STARTED',
-        0x008d: 'GATT_ENCRYPED_NO_MITM',
-        0x008e: 'GATT_NOT_ENCRYPTED',
-        0x008f: 'GATT_CONGESTED',
-        0x0090: 'GATT_DUP_REG',
-        0x0091: 'GATT_ALREADY_OPEN',
-        0x0092: 'GATT_CANCEL',
-        0x00fd: 'GATT_CCC_CFG_ERR',
-        0x00fe: 'GATT_PRC_IN_PROGRESS',
-        0x00ff: 'GATT_OUT_OF_RANGE',
-        0x0101: 'GATT_FAILURE',
-    }
-    GATT_SUCCESS = 0x0000
-
-    CONNECTION_STATE_NAMES = {
-        BluetoothProfile.STATE_DISCONNECTED: 'STATE_DISCONNECTED',
-        BluetoothProfile.STATE_CONNECTING: 'STATE_CONNECTING',
-        BluetoothProfile.STATE_CONNECTED: 'STATE_CONNECTED',
-        BluetoothProfile.STATE_DISCONNECTING: 'STATE_DISCONNECTING'
-    }
 
 class BleakClientP4Android(BaseBleakClient):
     """A python-for-android Bleak Client
@@ -158,10 +60,10 @@ class BleakClientP4Android(BaseBleakClient):
         """
         loop = asyncio.get_event_loop()
 
-        self.__adapter = _java.BluetoothAdapter.getDefaultAdapter()
+        self.__adapter = defs.BluetoothAdapter.getDefaultAdapter()
         if self.__adapter is None:
             raise BleakError('Bluetooth is not supported on this hardware platform')
-        if self.__adapter.getState() != _java.STATE_ON:
+        if self.__adapter.getState() != defs.STATE_ON:
             raise BleakError('Bluetooth is not turned on')
 
         self.__device = self.__adapter.getRemoteDevice(self.address)
@@ -172,7 +74,7 @@ class BleakClientP4Android(BaseBleakClient):
 
         self.__gatt, = await self.__callbacks.perform_and_wait(
             dispatchApi = self.__device.connectGatt,
-            dispatchParams = (_java.context, False, self.__callbacks.java),
+            dispatchParams = (defs.context, False, self.__callbacks.java, defs.TRANSPORT_LE),
             resultApi = 'onConnectionStateChange',
             resultExpected = ('STATE_CONNECTED',),
             return_indicates_status = False
@@ -245,18 +147,18 @@ class BleakClientP4Android(BaseBleakClient):
 
         bondedFuture = loop.create_future()
         def handleBondStateChanged(context, intent):
-            bond_state = intent.getIntExtra(_java.EXTRA_BOND_STATE, -1)
+            bond_state = intent.getIntExtra(defs.EXTRA_BOND_STATE, -1)
             if bond_state == -1:
                 loop.call_soon_threadsafe(
                     bondedFuture.set_exception,
                     BleakError('Unexpected bond state {}'.format(bond_state))
                 )
-            elif bond_state == _java.BOND_NONE:
+            elif bond_state == defs.BOND_NONE:
                 loop.call_soon_threadsafe(
                     bondedFuture.set_exception,
                     BleakError('Device with address {0} could not be paired with.'.format(self.address))
                 )
-            elif bond_state == _java.BOND_BONDED:
+            elif bond_state == defs.BOND_BONDED:
                 loop.call_soon_threadsafe(
                     bondedFuture.set_result,
                     True
@@ -267,9 +169,9 @@ class BleakClientP4Android(BaseBleakClient):
         try:
             # See if it is already paired.
             bond_state = self.__device.getBondState()
-            if bond_state == _java.BOND_BONDED:
+            if bond_state == defs.BOND_BONDED:
                 return True
-            elif bond_state == _java.BOND_NONE:
+            elif bond_state == defs.BOND_NONE:
                 logger.debug(
                     "Pairing to BLE device @ {0}".format(self.address)
                 )
@@ -481,9 +383,9 @@ class BleakClientP4Android(BaseBleakClient):
             )
 
         if response:
-            characteristic.obj.setWriteType(_java.WRITE_TYPE_DEFAULT)
+            characteristic.obj.setWriteType(defs.WRITE_TYPE_DEFAULT)
         else:
-            characteristic.obj.setWriteType(_java.WRITE_TYPE_NO_RESPONSE)
+            characteristic.obj.setWriteType(defs.WRITE_TYPE_NO_RESPONSE)
 
         characteristic.obj.setValue(data)
 
@@ -577,7 +479,7 @@ class BleakClientP4Android(BaseBleakClient):
                 )
             )
         
-        await self.write_gatt_descriptor(characteristic.notification_descriptor, _java.ENABLE_NOTIFICATION_VALUE)
+        await self.write_gatt_descriptor(characteristic.notification_descriptor, defs.ENABLE_NOTIFICATION_VALUE)
 
     async def stop_notify(
         self,
@@ -598,7 +500,7 @@ class BleakClientP4Android(BaseBleakClient):
         if not characteristic:
             raise BleakError("Characteristic {} not found!".format(char_specifier))
         
-        await self.write_gatt_descriptor(characteristic.notification_descriptor, _java.DISABLE_NOTIFICATION_VALUE)
+        await self.write_gatt_descriptor(characteristic.notification_descriptor, defs.DISABLE_NOTIFICATION_VALUE)
 
         if not self.__gatt.setCharacteristicNotification(characteristic.obj, False):
             raise BleakError(
@@ -614,113 +516,18 @@ class _PythonBluetoothGattCallback(utils.AsyncJavaCallbacks):
     def __init__(self, client, loop):
         super().__init__(loop)
         self._client = client
-        self.java = _java.PythonBluetoothGattCallback(self)
-        #self.futures = {}
-        #self.states = {}
-
-    def __del__(self):
-        # sometimes there's a segfault; it may have been resolved.
-        # if not, this message was to help figure out what had been deallocated when it happened
-        print('DESTROYING CLIENT CALLBACKS!  WILL NO MORE BE CALLED?')
-
-    #def _if_expected(self, result, expected):
-    #    if result[:len(expected)] == expected[:]:
-    #        return result[len(expected):]
-    #    else:
-    #        return None
-
-    #async def perform_and_wait(self, dispatchApi, dispatchParams, resultApi, resultExpected = (), unless_already = False, return_indicates_status = True):
-    #    result2 = None
-    #    if unless_already and resultApi in self.futures:
-    #        state = self.futures[resultApi]
-    #        if state.done():
-    #            result2 = self._if_expected(state.result(), resultExpected)
-    #            result1 = bool(result2)
-
-    #    if result2 is not None:
-    #        logger.debug("Not waiting for android api {0} because found {1}".format(resultApi, resultExpected))
-    #    else:
-    #        logger.debug("Waiting for android api {0}".format(resultApi))
-
-    #        state = self._loop.create_future()
-    #        self.futures[resultApi] = state
-    #        result1 = dispatchApi(*dispatchParams)
-    #        if return_indicates_status and not result1:
-    #            del self.futures[resultApi]
-    #            raise BleakError('{} failed, not waiting for {}'.format(dispatchApi.__name__, resultApi))
-    #        result2 = await self.expect(state, *resultExpected)
-
-    #        logger.debug("{0} succeeded {1}".format(resultApi, result2))
-
-    #    if return_indicates_status:
-    #        return result2
-    #    else:
-    #        return (result1, *result2)
-
-    #async def expect(self, future, *expected):
-    #    result = await future
-    #    match = self._if_expected(result, expected)
-    #    if match is not None:
-    #        return match
-    #    else:
-    #        raise BleakError('Expected', expected, 'got', result)
-
-    #def _result_state_unthreadsafe(self, status, source, data):
-    #    status_str = _java.GATT_STATUS_NAMES.get(status, status)
-    #        # some ideas found on the internet for managing GATT_ERROR 133 0x85
-    #        # (disputed) change setReportDelay from 0 to 400 (or 500)
-    #        # retry after delay up to 2 more times
-    #        # connect while hardware already powered up from scanning, before scanning stops
-    #        # do not do a cancelDiscovery at end of scanning; let finish on own
-    #        # keep bluetoothgatt calls in main thread
-    #        # pass BluetoothDevice.TRANSPORT_LE to connection call
-    #        # other solutions mentioned on https://github.com/android/connectivity-samples/issues/18
-    #    logger.debug("Java state transfer {0} {1}: {2}".format(source, status_str, data))
-    #    self.states[source] = (status_str, *data)
-    #    future = self.futures.get(source, None)
-    #    if future is not None and not future.done():
-    #        if status == _java.GATT_SUCCESS:
-    #            future.set_result(data)
-    #        else:
-    #            future.set_exception(BleakError(source, status_str, *data))
-    #    else:
-    #        if source == 'onConnectionStateChange' and data[0] == 'STATE_DISCONNECTED':
-    #            if self._client._disconnected_callback is not None:
-    #                self._client._disconnected_callback(self._client)
-    #        elif status != _java.GATT_SUCCESS:
-    #            # an error happened with nothing waiting for it
-    #            exception = BleakError(source, status_str, *data)
-    #            namedfutures = [namedfuture for namedfuture in self.futures.items() if not future.done()]
-    #            if len(namedfutures):
-    #                # send it on existing requests
-    #                for name, future in namedfutures:
-    #                    warnings.warn('Redirecting error without home to {0}'.format(name))
-    #                    future.set_exception(exception)
-    #            else:
-    #                # send it on the event thread
-    #                raise exception
-                    
-    #def _result_state_threadsafe(self, status, source, *data):
-    #    self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, status, source, data)
+        self.java = defs.PythonBluetoothGattCallback(self)
 
     def result_state(self, status, resultApi, *data):
-        # some ideas found on the internet for managing GATT_ERROR 133 0x85
-        # (disputed) change setReportDelay from 0 to 400 (or 500)
-        # retry after delay up to 2 more times
-        # connect while hardware already powered up from scanning, before scanning stops
-        # do not do a cancelDiscovery at end of scanning; let finish on own
-        # keep bluetoothgatt calls in main thread
-        # pass BluetoothDevice.TRANSPORT_LE to connection call
-        # other solutions mentioned on https://github.com/android/connectivity-samples/issues/18
-        if status == _java.GATT_SUCCESS:
+        if status == defs.GATT_SUCCESS:
             failure_str = None
         else:
-            failure_str = _java.GATT_STATUS_NAMES.get(status, status)
+            failure_str = defs.GATT_STATUS_NAMES.get(status, status)
         self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, failure_str, resultApi, data)
 
     @java_method('(II)V')
     def onConnectionStateChange(self, status, new_state):
-        state = _java.CONNECTION_STATE_NAMES.get(new_state, new_state)
+        state = defs.CONNECTION_STATE_NAMES.get(new_state, new_state)
         try:
             self.result_state(status, 'onConnectionStateChange', state)
         except BleakError:

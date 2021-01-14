@@ -20,7 +20,6 @@ class ExampleApp(App):
         self.running = True
 
     def build(self):
-        print('build')
         self.scrollview = ScrollView(do_scroll_x=False, scroll_type=['bars', 'content'])
         self.label = Label(font_size='10sp')
         self.scrollview.add_widget(self.label)
@@ -40,9 +39,7 @@ class ExampleApp(App):
         self.running = False
 
     async def example(self):
-        print('constructing scanner')
         while self.running:
-            self.line('still running')
             try:
                 self.line('scanning')
                 scanned_devices = await bleak.BleakScanner.discover(1)
@@ -54,10 +51,10 @@ class ExampleApp(App):
                 scanned_devices.sort(key=lambda device: -device.rssi)
 
                 for device in scanned_devices:
-                    self.line('{0} {1}dB'.format(str(device), device.rssi))
+                    self.line('{0} {1}dB'.format(str(device)[:24], device.rssi))
 
                 for device in scanned_devices:
-                    self.line('Connecting to {0} "{1}" ...'.format(device.address, device.name))
+                    self.line('Connecting to {0} ...'.format(str(device)[:24]))
                     client = bleak.BleakClient(device.address)
                     try:
                         await client.connect()
@@ -71,15 +68,12 @@ class ExampleApp(App):
                     finally:
                         await client.disconnect()
             except bleak.exc.BleakError as e:
-                import traceback
-                traceback.print_exc()
                 self.line('ERROR {0}'.format(e))
                 await asyncio.sleep(1)
         self.line('example loop terminated', True)
 
 
 if __name__ == '__main__':
-    print('main')
     Logger.setLevel(logging.DEBUG)
 
     # app running on one thread with two async coroutines
@@ -89,7 +83,7 @@ if __name__ == '__main__':
         app.async_run('asyncio'),
         app.example()
     )
-    firstexception = asyncio.wait(coroutines, return_when=asyncio.FIRST_EXCEPTION)
-    results, ongoing = loop.run_until_complete(firstexception)
+    firstcompleted = asyncio.wait(coroutines, return_when=asyncio.FIRST_COMPLETED)
+    results, ongoing = loop.run_until_complete(firstcompleted)
     for result in results:
         result.result() # raises exceptions from asyncio.wait

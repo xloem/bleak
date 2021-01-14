@@ -10,41 +10,11 @@ from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
 
 from android.broadcast import BroadcastReceiver
-from android.permissions import request_permissions, Permission
+from android.permissions import request_permissions
 from jnius import autoclass, cast, PythonJavaClass, java_method
 
+from . import defs
 from . import utils
-
-class _java:
-    BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
-    ScanCallback = autoclass('android.bluetooth.le.ScanCallback')
-    ScanFilter = autoclass('android.bluetooth.le.ScanFilter')
-    ScanFilterBuilder = autoclass('android.bluetooth.le.ScanFilter$Builder')
-    ScanSettings = autoclass('android.bluetooth.le.ScanSettings')
-    ScanSettingsBuilder = autoclass('android.bluetooth.le.ScanSettings$Builder')
-    List = autoclass('java.util.ArrayList')
-    PythonScanCallback = autoclass('com.github.hbldh.bleak.PythonScanCallback')
-
-    ACCESS_FINE_LOCATION = Permission.ACCESS_FINE_LOCATION
-    ACCESS_COARSE_LOCATION = Permission.ACCESS_COARSE_LOCATION
-    ACCESS_BACKGROUND_LOCATION = 'android.permission.ACCESS_BACKGROUND_LOCATION'
-
-    ACTION_STATE_CHANGED = BluetoothAdapter.ACTION_STATE_CHANGED
-    EXTRA_STATE = BluetoothAdapter.EXTRA_STATE
-
-    STATE_ERROR = BluetoothAdapter.ERROR
-    STATE_OFF = BluetoothAdapter.STATE_OFF
-    STATE_TURNING_ON = BluetoothAdapter.STATE_TURNING_ON
-    STATE_ON = BluetoothAdapter.STATE_ON
-    STATE_TURNING_OFF = BluetoothAdapter.STATE_TURNING_OFF
-
-    SCAN_FAILED_NAMES = {
-        ScanCallback.SCAN_FAILED_ALREADY_STARTED: 'SCAN_FAILED_ALREADY_STARTED',
-        ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED: 'SCAN_FAILED_APPLICATION_REGISTRATION_FAILED',
-        ScanCallback.SCAN_FAILED_FEATURE_UNSUPPORTED: 'SCAN_FAILED_FEATURE_UNSUPPORTED',
-        ScanCallback.SCAN_FAILED_INTERNAL_ERROR: 'SCAN_FAILED_INTERNAL_ERROR'
-    }
-    SCAN_FAILED_APPLICATION_REGISTRATION_FAILED = ScanCallback.SCAN_FAILED_APPLICATION_REGISTRATION_FAILED
 
 logger = logging.getLogger(__name__)
 
@@ -77,9 +47,11 @@ class BleakScannerP4Android(BaseBleakScanner):
         self.__stop()
 
     async def start(self):
-        print('start')
         if BleakScannerP4Android.__scanner is not None:
             raise BleakError('A BleakScanner is already scanning on this adapter.')
+
+        logger.debug('Starting BTLE scan')
+
         loop = asyncio.get_event_loop()
 
         if self.__javascanner is None:
@@ -93,37 +65,36 @@ class BleakScannerP4Android(BaseBleakScanner):
                 else:
                     loop.call_soon_threadsafe(permission_acknowledged.set_exception(BleakError("User denied access to " + str(permissions))))
             request_permissions([
-                    _java.ACCESS_FINE_LOCATION,
-                    _java.ACCESS_COARSE_LOCATION,
-                    _java.ACCESS_BACKGROUND_LOCATION],
+                    defs.ACCESS_FINE_LOCATION,
+                    defs.ACCESS_COARSE_LOCATION,
+                    defs.ACCESS_BACKGROUND_LOCATION],
                 handle_permissions)
             await permission_acknowledged
     
-            self.__adapter = _java.BluetoothAdapter.getDefaultAdapter()
+            self.__adapter = defs.BluetoothAdapter.getDefaultAdapter()
             if self.__adapter is None:
                 raise BleakError('Bluetooth is not supported on this hardware platform')
-            if self.__adapter.getState() != _java.STATE_ON:
+            if self.__adapter.getState() != defs.STATE_ON:
                 raise BleakError('Bluetooth is not turned on')
         
             self.__javascanner = self.__adapter.getBluetoothLeScanner()
-            print('SCANNER IS', repr(self.__javascanner))
 
         BleakScannerP4Android.__scanner = self
 
-        filters = cast('java.util.List',_java.List())
-        # filters could be built with _java.ScanFilterBuilder
+        filters = cast('java.util.List',defs.List())
+        # filters could be built with defs.ScanFilterBuilder
 
         scanfuture = self.__callback.perform_and_wait(
             dispatchApi = self.__javascanner.startScan,
             dispatchParams = (
                 filters,
-                _java.ScanSettingsBuilder().
-                    setScanMode(_java.ScanSettings.SCAN_MODE_LOW_LATENCY).
+                defs.ScanSettingsBuilder().
+                    setScanMode(defs.ScanSettings.SCAN_MODE_LOW_LATENCY).
                     setReportDelay(0).
-                    setPhy(_java.ScanSettings.PHY_LE_ALL_SUPPORTED).
-                    setNumOfMatches(_java.ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT).
-                    setMatchMode(_java.ScanSettings.MATCH_MODE_AGGRESSIVE).
-                    setCallbackType(_java.ScanSettings.CALLBACK_TYPE_ALL_MATCHES).
+                    setPhy(defs.ScanSettings.PHY_LE_ALL_SUPPORTED).
+                    setNumOfMatches(defs.ScanSettings.MATCH_NUM_MAX_ADVERTISEMENT).
+                    setMatchMode(defs.ScanSettings.MATCH_MODE_AGGRESSIVE).
+                    setCallbackType(defs.ScanSettings.CALLBACK_TYPE_ALL_MATCHES).
                     build(),
                 self.__callback.java
             ),
@@ -137,20 +108,19 @@ class BleakScannerP4Android(BaseBleakScanner):
         except asyncio.exceptions.TimeoutError:
             pass
         except BleakError as bleakerror:
-            print('errory !!!')
-            logging.debug(repr(bleakerror) + repr(bleakerror.args))
             await self.stop()
             if bleakerror.args != ('onScan', 'SCAN_FAILED_APPLICATION_REGISTRATION_FAILED'):
                 raise bleakerror
             else:
-                # there's probably a clearer solution to this if android source and vendor
+                # there might be a clearer solution to this if android source and vendor
                 # documentation are reviewed for the meaning of the error
                 # https://stackoverflow.com/questions/27516399/solution-for-ble-scans-scan-failed-application-registration-failed
                 warnings.warn('BT API gave SCAN_FAILED_APPLICATION_REGISTRATION_FAILED.  Resetting adapter.')
+
                 def handlerWaitingForState(state, stateFuture):
                     def handleAdapterStateChanged(context, intent):
-                        adapter_state = intent.getIntExtra(_java.EXTRA_STATE, _java.STATE_ERROR)
-                        if adapter_state == _java.STATE_ERROR:
+                        adapter_state = intent.getIntExtra(defs.EXTRA_STATE, defs.STATE_ERROR)
+                        if adapter_state == defs.STATE_ERROR:
                             loop.call_soon_threadsafe(
                                 stateOffFuture.set_exception,
                                 BleakError('Unexpected adapter state {}'.format(adapter_state))
@@ -162,35 +132,37 @@ class BleakScannerP4Android(BaseBleakScanner):
                             )
                     return handleAdapterStateChanged
 
+                logger.info('disabling bluetooth adapter to handle SCAN_FAILED_APPLICATION_REGSTRATION_FAILED ...')
                 stateOffFuture = loop.create_future()
-                receiver = BroadcastReceiver(handlerWaitingForState(_java.STATE_OFF, stateOffFuture), actions=[_java.ACTION_STATE_CHANGED])
+                receiver = BroadcastReceiver(handlerWaitingForState(defs.STATE_OFF, stateOffFuture), actions=[defs.ACTION_STATE_CHANGED])
                 receiver.start()
                 try:
-                    print('turning off')
                     self.__adapter.disable()
-                    print('waiting for state=off')
                     await stateOffFuture
                 finally:
                     receiver.stop()
 
+                logger.info('re-enabling bluetooth adapter ...')
                 stateOnFuture = loop.create_future()
-                receiver = BroadcastReceiver(handlerWaitingForState(_java.STATE_ON, stateOnFuture), actions=[_java.ACTION_STATE_CHANGED])
+                receiver = BroadcastReceiver(handlerWaitingForState(defs.STATE_ON, stateOnFuture), actions=[defs.ACTION_STATE_CHANGED])
+                receiver.start()
                 try:
-                    print('turning on')
                     self.__adapter.enable()
-                    print('waiting for state=on')
                     await stateOnFuture
                 finally:
                     receiver.stop()
+                logger.debug('restarting scan ...')
 
                 return await self.start()
 
     def __stop(self):
-        print('stop')
         if self.__javascanner is not None:
+            logger.debug('Stopping BTLE scan')
             self.__javascanner.stopScan(self.__callback.java)
             BleakScannerP4Android.__scanner = None
             self.__javascanner = None
+        else:
+            logger.debug('BTLE scan already stopped')
 
     async def stop(self):
         self.__stop()
@@ -207,18 +179,14 @@ class _PythonScanCallback(utils.AsyncJavaCallbacks):
     def __init__(self, scanner, loop):
         super().__init__(loop)
         self._scanner = scanner
-        self.java = _java.PythonScanCallback(self)
-        print('INIT SCANNER CALLBACK!')
-
-    def __del__(self):
-        print('DESTROYING SCANNER CALLBACK!  HAS SCANNING STOPPED?')
+        self.java = defs.PythonScanCallback(self)
 
     def result_state(self, status_str, name, *data):
         self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, status_str, name, data)
 
     @java_method('(I)V')
     def onScanFailed(self, errorCode):
-        self.result_state(_java.SCAN_FAILED_NAMES[errorCode], 'onScan')
+        self.result_state(defs.SCAN_FAILED_NAMES[errorCode], 'onScan')
     
     @java_method('(Landroid/bluetooth/le/ScanResult;)V')
     def onScanResult(self, result):
@@ -231,7 +199,7 @@ class _PythonScanCallback(utils.AsyncJavaCallbacks):
                 for index in range(len(service_uuids))]
         manufacturer_data = record.getManufacturerSpecificData()
         manufacturer_data = {
-            manufacturer_data.keyAt(index): manufacturer_data.valueAt(index)
+            manufacturer_data.keyAt(index): bytearray(manufacturer_data.valueAt(index).tolist())
             for index in range(manufacturer_data.size())
         }
         service_data_iterator = record.getServiceData().entrySet().iterator()

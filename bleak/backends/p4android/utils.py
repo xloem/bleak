@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import warnings
 
 from jnius import PythonJavaClass
 
@@ -25,11 +26,10 @@ class AsyncJavaCallbacks(PythonJavaClass):
 
     async def perform_and_wait(self, dispatchApi, dispatchParams, resultApi, resultExpected = (), unless_already = False, return_indicates_status = True):
         result2 = None
-        if unless_already and resultApi in self.futures:
-            state = self.futures[resultApi]
-            if state.done():
-                result2 = self._if_expected(state.result(), resultExpected)
-                result1 = bool(result2)
+        if unless_already:
+            if resultApi in self.states:
+                result2 = self._if_expected(self.states[resultApi][1:], resultExpected)
+                result1 = True
 
         if result2 is not None:
             logger.debug("Not waiting for android api {0} because found {1}".format(resultApi, resultExpected))
@@ -72,6 +72,5 @@ class AsyncJavaCallbacks(PythonJavaClass):
                         warnings.warn('Redirecting error without home to {0}'.format(name))
                         future.set_exception(exception)
                 else:
-                    print('len(namedfutures) =', len(namedfutures), 'len(self.futures) =', len(self.futures))
                     # send it on the event thread
                     raise exception
