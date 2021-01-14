@@ -40,18 +40,21 @@ class ExampleApp(App):
         self.running = False
 
     async def example(self):
-        scanner = bleak.BleakScanner()
+        print('constructing scanner')
         while self.running:
+            self.line('still running')
             try:
                 self.line('scanning')
-                scanned_devices = await scanner.discover(1)
+                scanned_devices = await bleak.BleakScanner.discover(1)
                 self.line('scanned', True)
 
                 if len(scanned_devices) == 0:
                     raise bleak.exc.BleakError('no devices found')
 
+                scanned_devices.sort(key=lambda device: -device.rssi)
+
                 for device in scanned_devices:
-                    self.line('{0} "{1}" {2}dB'.format(device.address, device.name, device.rssi))
+                    self.line('{0} {1}dB'.format(str(device), device.rssi))
 
                 for device in scanned_devices:
                     self.line('Connecting to {0} "{1}" ...'.format(device.address, device.name))
@@ -62,41 +65,14 @@ class ExampleApp(App):
                         for service in services.services.values():
                             self.line('  service {0}'.format(service.uuid))
                             for characteristic in service.characteristics:
-                                self.line('  characteristic {0} {1}'.format(characteristic.uuid, hex(characteristic.handle)))
-                                for descriptor in characteristic.descriptors:
-                                    self.line('  descriptor {0} {1}'.format(descriptor.uuid, hex(descriptor.handle)))
-                        if device.name[:4] == 'Muse':
-                            # let's get a version request and stream a channel
-                            serial='273e0001-4c4d-454d-96be-f03bac821358'
-                            channel='273e0003-4c4d-454d-96be-f03bac821358'
-                            # subscribe to both
-                            queue = asyncio.Queue()
-                            line = ''
-                            def serial_data(handle, data):
-                                nonlocal line
-                                line += data[1:1+data[0]].decode('utf-8')
-                                if line[-1] == '}':
-                                    self.line(line)
-                                    line = ''
-                                    queue.put_nowait(line)
-                            self.line('starting notify 1')
-                            await client.start_notify(serial, serial_data)
-                            future = asyncio.get_event_loop().create_future()
-                            self.line('writing data ' + str(client))
-                            await client.write_gatt_char(serial, bytearray('\x03v1\n', 'utf-8'), False)
-                            await queue.get()
-                            await client.write_gatt_char(serial, bytearray('\x02s\n', 'utf-8'), False)
-                            await queue.get()
-                            await client.write_gatt_char(serial, bytearray('\x04p63\n', 'utf-8'), False)
-                            await queue.get()
-                            await client.write_gatt_char(serial, bytearray('\x02d\n', 'utf-8'), False)
-                            await queue.get()
-                            self.line('done')
-
-                        await client.disconnect()
+                                self.line('  characteristic {0} {1} ({2} descriptors)'.format(characteristic.uuid, hex(characteristic.handle), len(characteristic.descriptors)))
                     except bleak.exc.BleakError as e:
                         self.line('  error {0}'.format(e))
+                    finally:
+                        await client.disconnect()
             except bleak.exc.BleakError as e:
+                import traceback
+                traceback.print_exc()
                 self.line('ERROR {0}'.format(e))
                 await asyncio.sleep(1)
         self.line('example loop terminated', True)

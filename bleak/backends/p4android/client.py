@@ -18,7 +18,9 @@ from bleak.backends.p4android.characteristic import BleakGATTCharacteristicP4And
 from bleak.backends.p4android.descriptor import BleakGATTDescriptorP4Android 
 
 from android.broadcast import BroadcastReceiver
-from jnius import autoclass, cast, PythonJavaClass, java_method
+from jnius import autoclass, cast, java_method
+
+from . import utils
 
 logger = logging.getLogger(__name__)
 
@@ -260,7 +262,9 @@ class BleakClientP4Android(BaseBleakClient):
                     True
                 )
 
-        with BroadcastReceiver(handleBondStateChanged, actions=[ACTION_BOND_STATE_CHANGED]):
+        receiver =  BroadcastReceiver(handleBondStateChanged, actions=[ACTION_BOND_STATE_CHANGED])
+        receiver.start()
+        try:
             # See if it is already paired.
             bond_state = self.__device.getBondState()
             if bond_state == _java.BOND_BONDED:
@@ -274,6 +278,8 @@ class BleakClientP4Android(BaseBleakClient):
                         "Could not initiate bonding with device @ {0}".format(self.address)
                     )
             return await bondedFuture
+        finally:
+            await receiver.stop()
 
     async def unpair(self) -> bool:
         """Unpair with the peripheral.
@@ -602,125 +608,129 @@ class BleakClientP4Android(BaseBleakClient):
             )
         del self._subscriptions[characteristic.handle]
 
-class _PythonBluetoothGattCallback(PythonJavaClass):
+class _PythonBluetoothGattCallback(utils.AsyncJavaCallbacks):
     __javainterfaces__ = ['com.github.hbldh.bleak.PythonBluetoothGattCallback$Interface']
-    __javacontext__ = 'app'
 
     def __init__(self, client, loop):
+        super().__init__(loop)
         self._client = client
-        self._loop = loop
         self.java = _java.PythonBluetoothGattCallback(self)
-        self.futures = {}
-        self.states = {}
+        #self.futures = {}
+        #self.states = {}
 
     def __del__(self):
         # sometimes there's a segfault; it may have been resolved.
         # if not, this message was to help figure out what had been deallocated when it happened
         print('DESTROYING CLIENT CALLBACKS!  WILL NO MORE BE CALLED?')
 
-    def _if_expected(self, result, expected):
-        if result[:len(expected)] == expected[:]:
-            return result[len(expected):]
-        else:
-            return None
+    #def _if_expected(self, result, expected):
+    #    if result[:len(expected)] == expected[:]:
+    #        return result[len(expected):]
+    #    else:
+    #        return None
 
-    async def perform_and_wait(self, dispatchApi, dispatchParams, resultApi, resultExpected = (), unless_already = False, return_indicates_status = True):
-        result2 = None
-        if unless_already and resultApi in self.futures:
-            state = self.futures[resultApi]
-            if state.done():
-                result2 = self._if_expected(state.result(), resultExpected)
-                result1 = bool(result2)
+    #async def perform_and_wait(self, dispatchApi, dispatchParams, resultApi, resultExpected = (), unless_already = False, return_indicates_status = True):
+    #    result2 = None
+    #    if unless_already and resultApi in self.futures:
+    #        state = self.futures[resultApi]
+    #        if state.done():
+    #            result2 = self._if_expected(state.result(), resultExpected)
+    #            result1 = bool(result2)
 
-        if result2 is not None:
-            logger.debug("Not waiting for android api {0} because found {1}".format(resultApi, resultExpected))
-        else:
-            logger.debug("Waiting for android api {0}".format(resultApi))
+    #    if result2 is not None:
+    #        logger.debug("Not waiting for android api {0} because found {1}".format(resultApi, resultExpected))
+    #    else:
+    #        logger.debug("Waiting for android api {0}".format(resultApi))
 
-            state = self._loop.create_future()
-            self.futures[resultApi] = state
-            result1 = dispatchApi(*dispatchParams)
-            if return_indicates_status and not result1:
-                del self.futures[resultApi]
-                raise BleakError('{} failed, not waiting for {}'.format(dispatchApi.__name__, resultApi))
-            result2 = await self.expect(state, *resultExpected)
+    #        state = self._loop.create_future()
+    #        self.futures[resultApi] = state
+    #        result1 = dispatchApi(*dispatchParams)
+    #        if return_indicates_status and not result1:
+    #            del self.futures[resultApi]
+    #            raise BleakError('{} failed, not waiting for {}'.format(dispatchApi.__name__, resultApi))
+    #        result2 = await self.expect(state, *resultExpected)
 
-            logger.debug("{0} succeeded {1}".format(resultApi, result2))
+    #        logger.debug("{0} succeeded {1}".format(resultApi, result2))
 
-        if return_indicates_status:
-            return result2
-        else:
-            return (result1, *result2)
+    #    if return_indicates_status:
+    #        return result2
+    #    else:
+    #        return (result1, *result2)
 
-    #def prepare_unless(self, source, *expected):
-    #    if source not in self.futures:
-    #        return self.prepare(source)
-    #    future = self.futures[source]
-    #    if future.done():
-    #        match = self._if_expected(future.result(), expected)
-    #        if match is not None:
-    #            logger.debug("Not waiting for java {0} because found {1}".format(source, *expected))
-    #            return match
+    #async def expect(self, future, *expected):
+    #    result = await future
+    #    match = self._if_expected(result, expected)
+    #    if match is not None:
+    #        return match
+    #    else:
+    #        raise BleakError('Expected', expected, 'got', result)
+
+    #def _result_state_unthreadsafe(self, status, source, data):
+    #    status_str = _java.GATT_STATUS_NAMES.get(status, status)
+    #        # some ideas found on the internet for managing GATT_ERROR 133 0x85
+    #        # (disputed) change setReportDelay from 0 to 400 (or 500)
+    #        # retry after delay up to 2 more times
+    #        # connect while hardware already powered up from scanning, before scanning stops
+    #        # do not do a cancelDiscovery at end of scanning; let finish on own
+    #        # keep bluetoothgatt calls in main thread
+    #        # pass BluetoothDevice.TRANSPORT_LE to connection call
+    #        # other solutions mentioned on https://github.com/android/connectivity-samples/issues/18
+    #    logger.debug("Java state transfer {0} {1}: {2}".format(source, status_str, data))
+    #    self.states[source] = (status_str, *data)
+    #    future = self.futures.get(source, None)
+    #    if future is not None and not future.done():
+    #        if status == _java.GATT_SUCCESS:
+    #            future.set_result(data)
     #        else:
-    #            return self.prepare(source)
-    #    logger.debug("Reusing existing wait for java {0}".format(source))
-    #    return future
-
-    async def expect(self, future, *expected):
-        result = await future
-        match = self._if_expected(result, expected)
-        if match is not None:
-            return match
-        else:
-            raise BleakError('Expected', expected, 'got', result)
-
-    def _result_state_unthreadsafe(self, status, source, data):
-        status_str = _java.GATT_STATUS_NAMES.get(status, status)
-            # some ideas found on the internet for managing GATT_ERROR 133 0x85
-            # (disputed) change setReportDelay from 0 to 400 (or 500)
-            # retry after delay up to 2 more times
-            # connect while hardware already powered up from scanning, before scanning stops
-            # do not do a cancelDiscovery at end of scanning; let finish on own
-            # keep bluetoothgatt calls in main thread
-            # pass BluetoothDevice.TRANSPORT_LE to connection call
-            # other solutions mentioned on https://github.com/android/connectivity-samples/issues/18
-        logger.debug("Java state transfer {0} {1}: {2}".format(source, status_str, data))
-        self.states[source] = (status_str, *data)
-        future = self.futures.get(source, None)
-        if future is not None and not future.done():
-            if status == _java.GATT_SUCCESS:
-                future.set_result(data)
-            else:
-                future.set_exception(BleakError(source, status_str, *data))
-        else:
-            if source == 'onConnectionStateChange' and data[0] == 'STATE_DISCONNECTED':
-                if self._client._disconnected_callback is not None:
-                    self._client._disconnected_callback(self._client)
-            elif status != _java.GATT_SUCCESS:
-                # an error happened with nothing waiting for it
-                exception = BleakError(source, status_str, *data)
-                namedfutures = [namedfuture for namedfuture in self.futures.items() if not future.done()]
-                if len(namedfutures):
-                    # send it on existing requests
-                    for name, future in namedfutures:
-                        warnings.warn('Redirecting error without home to {0}'.format(name))
-                        future.set_exception(exception)
-                else:
-                    # send it on the event thread
-                    raise exception
+    #            future.set_exception(BleakError(source, status_str, *data))
+    #    else:
+    #        if source == 'onConnectionStateChange' and data[0] == 'STATE_DISCONNECTED':
+    #            if self._client._disconnected_callback is not None:
+    #                self._client._disconnected_callback(self._client)
+    #        elif status != _java.GATT_SUCCESS:
+    #            # an error happened with nothing waiting for it
+    #            exception = BleakError(source, status_str, *data)
+    #            namedfutures = [namedfuture for namedfuture in self.futures.items() if not future.done()]
+    #            if len(namedfutures):
+    #                # send it on existing requests
+    #                for name, future in namedfutures:
+    #                    warnings.warn('Redirecting error without home to {0}'.format(name))
+    #                    future.set_exception(exception)
+    #            else:
+    #                # send it on the event thread
+    #                raise exception
                     
-        
-    def _result_state_threadsafe(self, status, source, *data):
-        self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, status, source, data)
+    #def _result_state_threadsafe(self, status, source, *data):
+    #    self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, status, source, data)
+
+    def result_state(self, status, resultApi, *data):
+        # some ideas found on the internet for managing GATT_ERROR 133 0x85
+        # (disputed) change setReportDelay from 0 to 400 (or 500)
+        # retry after delay up to 2 more times
+        # connect while hardware already powered up from scanning, before scanning stops
+        # do not do a cancelDiscovery at end of scanning; let finish on own
+        # keep bluetoothgatt calls in main thread
+        # pass BluetoothDevice.TRANSPORT_LE to connection call
+        # other solutions mentioned on https://github.com/android/connectivity-samples/issues/18
+        if status == _java.GATT_SUCCESS:
+            failure_str = None
+        else:
+            failure_str = _java.GATT_STATUS_NAMES.get(status, status)
+        self._loop.call_soon_threadsafe(self._result_state_unthreadsafe, failure_str, resultApi, data)
 
     @java_method('(II)V')
     def onConnectionStateChange(self, status, new_state):
         state = _java.CONNECTION_STATE_NAMES.get(new_state, new_state)
-        self._result_state_threadsafe(status, 'onConnectionStateChange', state)
+        try:
+            self.result_state(status, 'onConnectionStateChange', state)
+        except BleakError:
+            pass
+        if state == 'STATE_DISCONNECTED' and self._client._disconnected_callback is not None:
+            self._client._disconnected_callback(self._client)
 
     @java_method('(I)V')
     def onServicesDiscovered(self, status):
-        self._result_state_threadsafe(status, 'onServicesDiscovered')
+        self.result_state(status, 'onServicesDiscovered')
 
     @java_method('(I[B)V')
     def onCharacteristicChanged(self, handle, value):
@@ -732,16 +742,16 @@ class _PythonBluetoothGattCallback(PythonJavaClass):
 
     @java_method('(II[B)V')
     def onCharacteristicRead(self, handle, status, value):
-        self._result_state_threadsafe(status, ('onCharacteristicRead', handle), bytes(value.tolist()))
+        self.result_state(status, ('onCharacteristicRead', handle), bytes(value.tolist()))
 
     @java_method('(II)V')
     def onCharacteristicWrite(self, handle, status):
-        self._result_state_threadsafe(status, ('onCharacteristicWrite', handle))
+        self.result_state(status, ('onCharacteristicWrite', handle))
     
     @java_method('(Ljava/lang/String;I[B)V')
     def onDescriptorRead(self, uuid, status, value):
-        self._result_state_threadsafe(status, ('onDescriptorRead', uuid), bytes(value.tolist()))
+        self.result_state(status, ('onDescriptorRead', uuid), bytes(value.tolist()))
 
     @java_method('(Ljava/lang/String;I)V')
     def onDescriptorWrite(self, uuid, status):
-        self._result_state_threadsafe(status, ('onDescriptorWrite', uuid))
+        self.result_state(status, ('onDescriptorWrite', uuid))
