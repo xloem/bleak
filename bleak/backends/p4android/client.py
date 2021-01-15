@@ -173,7 +173,7 @@ class BleakClientP4Android(BaseBleakClient):
                 loop.call_soon_threadsafe(bondedFuture.set_result, True)
 
         receiver = BroadcastReceiver(
-            handleBondStateChanged, actions=[ACTION_BOND_STATE_CHANGED]
+            handleBondStateChanged, actions=[defs.ACTION_BOND_STATE_CHANGED]
         )
         receiver.start()
         try:
@@ -322,7 +322,7 @@ class BleakClientP4Android(BaseBleakClient):
 
         """
         if not isinstance(desc_specifier, BleakGATTDescriptorP4Android):
-            descriptor = self.services.get_descriptor(descriptor)
+            descriptor = self.services.get_descriptor(desc_specifier)
         else:
             descriptor = desc_specifier
 

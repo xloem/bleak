@@ -57,9 +57,10 @@ class AsyncJavaCallbacks(PythonJavaClass):
                 raise BleakError(
                     "api call failed, not waiting for {}".format(resultApi)
                 )
-            result2 = self._if_expected(await state, resultExpected)
+            data = await state
+            result2 = self._if_expected(data, resultExpected)
             if result2 is None:
-                raise BleakError("Expected", resultExpected, "got", result)
+                raise BleakError("Expected", resultExpected, "got", data)
 
             logger.debug("{0} succeeded {1}".format(resultApi, result2))
 

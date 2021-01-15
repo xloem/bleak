@@ -3,6 +3,7 @@ from typing import Union, List
 
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.descriptor import BleakGATTDescriptor
+from bleak.exc import BleakError
 
 from jnius import autoclass
 
