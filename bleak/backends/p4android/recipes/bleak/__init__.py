@@ -1,9 +1,7 @@
 from pythonforandroid.recipe import PythonRecipe
 from pythonforandroid.toolchain import shprint, info
-from pythonforandroid.util import current_directory
-from pythonforandroid import logger
 import sh
-from os.path import join, abspath
+from os.path import join
 
 
 class BleakRecipe(PythonRecipe):

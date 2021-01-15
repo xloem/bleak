@@ -11,7 +11,7 @@ from bleak.exc import BleakError
 
 from android.broadcast import BroadcastReceiver
 from android.permissions import request_permissions
-from jnius import autoclass, cast, PythonJavaClass, java_method
+from jnius import cast, java_method
 
 from . import defs
 from . import utils
