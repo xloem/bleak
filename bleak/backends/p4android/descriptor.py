@@ -3,15 +3,12 @@ from bleak.exc import BleakError
 
 import warnings
 
+
 class BleakGATTDescriptorP4Android(BleakGATTDescriptor):
     """GATT Descriptor implementation for python-for-android backend"""
-    
+
     def __init__(
-        self,
-        java,
-        characteristic_uuid: str,
-        characteristic_handle: int,
-        index: int
+        self, java, characteristic_uuid: str, characteristic_handle: int, index: int
     ):
         super(BleakGATTDescriptorP4Android, self).__init__(java)
         self.__uuid = self.obj.getUuid().toString()
@@ -39,6 +36,10 @@ class BleakGATTDescriptorP4Android(BleakGATTDescriptor):
     @property
     def handle(self) -> int:
         """Integer handle for this descriptor"""
-       # 2021-01 The Android Bluetooth API does not appear to provide access to descriptor handles.
-        warnings.warn('Faking descriptor {0} as having handle {1}.'.format(self.__uuid, hex(self.__fake_handle)))
+        # 2021-01 The Android Bluetooth API does not appear to provide access to descriptor handles.
+        warnings.warn(
+            "Faking descriptor {0} as having handle {1}.".format(
+                self.__uuid, hex(self.__fake_handle)
+            )
+        )
         return self.__fake_handle

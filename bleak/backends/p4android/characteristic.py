@@ -6,21 +6,25 @@ from bleak.backends.descriptor import BleakGATTDescriptor
 
 from jnius import autoclass
 
+
 class _java:
-    BluetoothGattCharacteristic = autoclass('android.bluetooth.BluetoothGattCharacteristic')
+    BluetoothGattCharacteristic = autoclass(
+        "android.bluetooth.BluetoothGattCharacteristic"
+    )
 
     CHARACTERISTIC_PROPERTY_DBUS_NAMES = {
-        BluetoothGattCharacteristic.PROPERTY_BROADCAST: 'broadcast',
-        BluetoothGattCharacteristic.PROPERTY_EXTENDED_PROPS: 'extended-properties',
-        BluetoothGattCharacteristic.PROPERTY_INDICATE: 'indicate',
-        BluetoothGattCharacteristic.PROPERTY_NOTIFY: 'notify',
-        BluetoothGattCharacteristic.PROPERTY_READ: 'read',
-        BluetoothGattCharacteristic.PROPERTY_SIGNED_WRITE: 'authenticated-signed-writes',
-        BluetoothGattCharacteristic.PROPERTY_WRITE: 'write',
-        BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE: 'write-without-response',
+        BluetoothGattCharacteristic.PROPERTY_BROADCAST: "broadcast",
+        BluetoothGattCharacteristic.PROPERTY_EXTENDED_PROPS: "extended-properties",
+        BluetoothGattCharacteristic.PROPERTY_INDICATE: "indicate",
+        BluetoothGattCharacteristic.PROPERTY_NOTIFY: "notify",
+        BluetoothGattCharacteristic.PROPERTY_READ: "read",
+        BluetoothGattCharacteristic.PROPERTY_SIGNED_WRITE: "authenticated-signed-writes",
+        BluetoothGattCharacteristic.PROPERTY_WRITE: "write",
+        BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE: "write-without-response",
     }
 
-    NOTIFICATION_DESCRIPTOR_UUID = "00002902-0000-1000-8000-00805f9b34fb";
+    NOTIFICATION_DESCRIPTOR_UUID = "00002902-0000-1000-8000-00805f9b34fb"
+
 
 class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     """GATT Characteristic implementation for the python-for-android backend"""
@@ -35,11 +39,10 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
 
         self.__properties = [
             name
-            for flag, name
-            in _java.CHARACTERISTIC_PROPERTY_DBUS_NAMES.items()
+            for flag, name in _java.CHARACTERISTIC_PROPERTY_DBUS_NAMES.items()
             if flag & self.obj.getProperties()
         ]
-        
+
     @property
     def service_uuid(self) -> str:
         """The uuid of the Service containing this characteristic"""
@@ -57,8 +60,7 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
 
     @property
     def properties(self) -> List:
-        """Properties of this characteristic
-        """
+        """Properties of this characteristic"""
         return self.__properties
 
     @property
@@ -71,11 +73,15 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     ) -> Union[BleakGATTDescriptor, None]:
         """Get a descriptor by UUID (str or uuid.UUID)"""
         if isinstance(specifier, int):
-            raise BleakError('The Android Bluetooth API does not provide access to descriptor handles.')
+            raise BleakError(
+                "The Android Bluetooth API does not provide access to descriptor handles."
+            )
 
-        matches = [descriptor
+        matches = [
+            descriptor
             for descriptor in self.descriptors
-            if descriptor.uuid == str(specifier)]
+            if descriptor.uuid == str(specifier)
+        ]
         if len(matches) == 0:
             return None
         return matches[0]
