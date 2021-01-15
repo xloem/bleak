@@ -9,6 +9,7 @@ from jnius import autoclass
 
 from . import defs
 
+
 class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
     """GATT Characteristic implementation for the python-for-android backend"""
 
