@@ -11,7 +11,7 @@ class BleakRecipe(PythonRecipe):
     url = None
     name = "bleak"
 
-    src_filename = join('..', '..', '..', '..', '..')
+    src_filename = join("..", "..", "..", "..", "..")
 
     depends = ["pyjnius"]
     call_hostpython_via_targetpython = False
