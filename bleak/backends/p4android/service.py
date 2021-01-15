@@ -12,7 +12,7 @@ class BleakGATTServiceP4Android(BleakGATTService):
         self.__uuid = self.obj.getUuid().toString()
         self.__handle = self.obj.getInstanceId()
         self.__characteristics = []
- 
+
     @property
     def uuid(self) -> str:
         """The UUID to this service"""
