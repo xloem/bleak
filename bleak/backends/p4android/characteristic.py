@@ -76,7 +76,7 @@ class BleakGATTCharacteristicP4Android(BleakGATTCharacteristic):
         Should not be used by end user, but rather by `bleak` itself.
         """
         self.__descriptors.append(descriptor)
-        if descriptor.uuid == defs.NOTIFICATION_DESCRIPTOR_UUID:
+        if descriptor.uuid == defs.CLIENT_CHARACTERISTIC_CONFIGURATION_UUID:
             self.__notification_descriptor = descriptor
 
     @property
