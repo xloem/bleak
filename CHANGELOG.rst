@@ -10,6 +10,11 @@ and this project adheres to `Semantic Versioning <https://semver.org/spec/v2.0.0
 `Unreleased`_
 -------------
 
+Added
+~~~~~
+
+* Added ``AdvertisementServiceData`` in BLEDevice in macOS devices
+
 Fixed
 ~~~~~
 
@@ -20,6 +25,7 @@ Fixed
 * Fixed ``BaseBleakClient.services_resolved`` not reset on disconnect on BlueZ
   backend. Merged #401.
 * Fixed RSSI missing in discovered devices on macOS backend. Merged #400.
+* Added python-for-android backend.
 
 
 `0.10.0`_ (2020-12-11)
