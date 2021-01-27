@@ -1,7 +1,7 @@
 Android backend
 ===============
 
-Quick-start: see the `example README <../../examples/kivy/README>`.  Buildozer
+Quick-start: see the `example README <../../examples/kivy/README>`_.  Buildozer
 will compile an app and upload it to a device.
 
 There are a handful of ways to run Python on Android.  Presently some code has
@@ -55,5 +55,5 @@ be added to the android application in the buildozer.spec file, and are also
 requested from the user at runtime.  This means that enabling bluetooth may not
 succeed if the user does not accept permissions.
 
-For an example of building an android bluetooth app, see `the example <../../examples/kivy>`
-and its accompanying `README <../../examples/kivy/README>`.
+For an example of building an android bluetooth app, see `the example <../../examples/kivy>`_
+and its accompanying `README <../../examples/kivy/README>`_.
