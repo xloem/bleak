@@ -5,12 +5,12 @@ Quick-start: see the `example README <../../examples/kivy/README>`_.  Buildozer
 will compile an app and upload it to a device.
 
 There are a handful of ways to run Python on Android.  Presently some code has
-been written for the `Python-for-Android <https://python-for-android.readthedocs.io/>`
-build tool, and the code has only been tested using the `Kivy Framework <https://kivy.org/>`.
+been written for the `Python-for-Android <https://python-for-android.readthedocs.io/>`_
+build tool, and the code has only been tested using the `Kivy Framework <https://kivy.org/>`_.
 The Kivy framework provides a way to make graphical applications using
 bluetooth that run on both android and desktop.
 
-An alternative framework is `Beeware <https://beeware.org>`.  An implementation
+An alternative framework is `Beeware <https://beeware.org>`_.  An implementation
 for Beeware would likely be very similar to Python-for-Android, if anybody is
 interested in contributing one.  As of 2020, the major task to tackle is making
 a custom template to embed Java subclasses of the Bluetooth Android interfaces,
@@ -18,7 +18,7 @@ for forwarding callbacks.
 
 The Python-for-Android backend classes are found in the
 ``bleak.backends.p4android`` package and are automatically selected when
-building with python-for-android or `Buildozer <https://buildozer.readthedocs.io/>`,
+building with python-for-android or `Buildozer <https://buildozer.readthedocs.io/>`_,
 Kivy's automated build tool.
 
 Considerations on Android
