@@ -10,8 +10,8 @@ build tool, and the code has only been tested using the `Kivy Framework <https:/
 The Kivy framework provides a way to make graphical applications using
 bluetooth that run on both android and desktop.
 
-An alternative framework is `Beeware <https://beeware.org>`_.  An implementation
-for Beeware would likely be very similar to Python-for-Android, if anybody is
+An alternative framework is `BeeWare <https://beeware.org>`_.  An implementation
+for BeeWare would likely be very similar to Python-for-Android, if anybody is
 interested in contributing one.  As of 2020, the major task to tackle is making
 a custom template to embed Java subclasses of the Bluetooth Android interfaces,
 for forwarding callbacks.
